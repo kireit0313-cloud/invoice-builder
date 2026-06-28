@@ -93,6 +93,101 @@ body {
   font-family: 'Noto Sans JP', sans-serif;
   color: var(--ink-soft);
 }
+  /* 管理画面レイアウト */
+#app {
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  background: var(--bg);
+}
+.admin-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.admin-header-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.admin-body {
+  padding: 2rem 1.5rem;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+.upload-area {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 2;
+}
+.upload-btn {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 10px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.cols-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cols-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--border);
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.cols-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+}
+.save-btn {
+  padding: 12px 32px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  align-self: flex-end;
+}
+.hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 1.5rem;
+}
 </style>
 </head>
 <body>
@@ -115,11 +210,57 @@ body {
   </div>
 </div>
 
-<!-- ログイン後の画面（仮） -->
+<!-- ログイン後の管理画面 -->
 <div id="app">
-  <p class="welcome" id="welcomeName"></p>
-  <p class="welcome-sub">ログインできました</p>
-  <button class="logout-btn" onclick="signOut()">ログアウト</button>
+  <!-- ヘッダー -->
+  <div class="admin-header">
+    <span class="admin-header-title">見積書・請求書メーカー</span>
+    <button class="logout-btn" onclick="signOut()">ログアウト</button>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div class="admin-body">
+
+    <!-- Excelアップロードカード -->
+    <div class="card">
+      <p class="card-title">① Excelテンプレートをアップロード</p>
+      <div class="upload-area">
+        <div>📁 Excelファイル（.xlsx）をここに選択</div>
+        <div style="font-size:11px; margin-top:4px;">対応形式：.xlsx</div>
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+          ファイルを選択
+        </button>
+        <input type="file" id="fileInput" accept=".xlsx" style="display:none">
+      </div>
+    </div>
+
+    <!-- 列確認テーブルカード（初期は非表示） -->
+    <div class="card" id="colsCard" style="display:none">
+      <p class="card-title">② 列の種類を確認・修正</p>
+      <table class="cols-table">
+        <thead>
+          <tr>
+            <th>列名（Excelの1行目）</th>
+            <th>自動判定された種類</th>
+          </tr>
+        </thead>
+        <tbody id="colsBody">
+          <!-- JavaScriptで行を追加予定 -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 保存ボタン（初期は非表示） -->
+    <button class="save-btn" id="saveBtn" style="display:none">
+      設定を保存する
+    </button>
+
+    <!-- アップロード前のヒント -->
+    <p class="hint" id="hintMsg">
+      Excelファイルをアップロードすると、列が自動で判定されます
+    </p>
+
+  </div>
 </div>
 
 <script type="module">
