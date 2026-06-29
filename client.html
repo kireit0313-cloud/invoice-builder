@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>見積書・請求書入力</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F8F9FA;
+  --surface: #FFFFFF;
+  --border: #E2E8F0;
+  --ink: #1A202C;
+  --ink-soft: #718096;
+  --accent: #3B82F6;
+  --danger: #EF4444;
+  --success: #10B981;
+}
+body {
+  background: var(--bg);
+  font-family: 'Noto Sans JP', sans-serif;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.header-sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+.body {
+  padding: 2rem 1.5rem;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+
+/* 明細テーブル */
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.items-table th {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 2px solid var(--border);
+  color: var(--ink-soft);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.items-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.items-table input {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.items-table input:focus {
+  border-color: var(--accent);
+}
+.items-table input[type="number"] {
+  text-align: right;
+}
+.col-service { width: 35%; }
+.col-qty     { width: 10%; }
+.col-price   { width: 18%; }
+.col-amount  { width: 18%; }
+.col-delete  { width: 6%; text-align: center; }
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 4px;
+}
+.delete-btn:hover { color: var(--danger); }
+
+.add-row-btn {
+  margin-top: 1rem;
+  padding: 8px 16px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  width: 100%;
+}
+.add-row-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 合計エリア */
+.totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--border);
+}
+.total-row {
+  display: flex;
+  gap: 2rem;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.total-row.grand {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.total-label { min-width: 80px; text-align: right; }
+.total-value { min-width: 100px; text-align: right; }
+
+/* アクションボタン */
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+.btn {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 500;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
+.btn:hover { opacity: 0.85; }
+
+/* ローディング・エラー */
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.error-box {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+/* 日付入力 */
+.date-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.date-input:focus { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title" id="headerTitle">読み込み中...</div>
+    <div class="header-sub">見積書・請求書入力</div>
+  </div>
+</div>
+
+<div class="body" id="mainBody">
+  <div class="loading">データを読み込んでいます...</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getFirestore, doc, getDoc }
+  from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyATf8RjZ7y_wjiiPJ1VR9KXktbDPXuMpFo",
+  authDomain: "idea-notebook-172e0.firebaseapp.com",
+  projectId: "idea-notebook-172e0",
+  storageBucket: "idea-notebook-172e0.firebasestorage.app",
+  messagingSenderId: "682338340449",
+  appId: "1:682338340449:web:598a4db429e148990e6420"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// URLのパラメータからクライアントIDを取得
+const params = new URLSearchParams(window.location.search);
+const clientId = params.get('id');
+
+// メイン処理
+async function init() {
+  if (!clientId) {
+    showError('クライアントIDが指定されていません。');
+    return;
+  }
+
+  try {
+    const snap = await getDoc(doc(db, 'clients', clientId));
+    if (!snap.exists()) {
+      showError(`クライアント「${clientId}」が見つかりません。`);
+      return;
+    }
+
+    const client = snap.data();
+    buildUI(client);
+  } catch(e) {
+    showError('データの読み込みに失敗しました：' + e.message);
+  }
+}
+
+// UI構築
+function buildUI(client) {
+  document.getElementById('headerTitle').textContent = client.clientName + ' 様';
+  document.title = client.clientName + ' 様 | 見積書・請求書入力';
+
+  const body = document.getElementById('mainBody');
+  body.innerHTML = `
+    <!-- 作業日カード -->
+    <div class="card">
+      <p class="card-title">作業日</p>
+      <input type="date" class="date-input" id="workDate"
+        value="${todayStr()}">
+    </div>
+
+    <!-- 明細入力カード -->
+    <div class="card">
+      <p class="card-title">明細を入力</p>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th class="col-service">サービス名</th>
+            <th class="col-qty">数量</th>
+            <th class="col-price">単価（円）</th>
+            <th class="col-amount">金額（円）</th>
+            <th class="col-delete"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody">
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
+
+      <!-- 合計 -->
+      <div class="totals">
+        <div class="total-row">
+          <span class="total-label">小計</span>
+          <span class="total-value" id="subtotal">¥0</span>
+        </div>
+        <div class="total-row">
+          <span class="total-label">消費税（10%）</span>
+          <span class="total-value" id="tax">¥0</span>
+        </div>
+        <div class="total-row grand">
+          <span class="total-label">合計</span>
+          <span class="total-value" id="grandTotal">¥0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- アクションボタン -->
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="alert('Excel出力は準備中です')">Excelで保存</button>
+      <button class="btn btn-primary" onclick="alert('PDF出力は準備中です')">PDF出力</button>
+    </div>
+  `;
+
+  // 最初の1行を追加
+  addRow();
+}
+
+// 今日の日付をyyyy-mm-dd形式で返す
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// 行を追加
+let rowCount = 0;
+window.addRow = function() {
+  rowCount++;
+  const id = 'row_' + rowCount;
+  const tr = document.createElement('tr');
+  tr.id = id;
+  tr.innerHTML = `
+    <td class="col-service">
+      <input type="text" placeholder="例：エアコン洗浄"
+        oninput="calcRow('${id}')">
+    </td>
+    <td class="col-qty">
+      <input type="number" value="1" min="0"
+        oninput="calcRow('${id}'); calcTotals()">
+    </td>
+    <td class="col-price">
+      <input type="number" value="0" min="0"
+        oninput="calcRow('${id}'); calcTotals()">
+    </td>
+    <td class="col-amount">
+      <input type="number" value="0" readonly
+        style="background:var(--bg); color:var(--ink-soft)">
+    </td>
+    <td class="col-delete">
+      <button class="delete-btn" onclick="deleteRow('${id}')">×</button>
+    </td>
+  `;
+  document.getElementById('itemsBody').appendChild(tr);
+  calcTotals();
+};
+
+// 行の金額を計算
+window.calcRow = function(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const inputs = row.querySelectorAll('input');
+  const qty = parseFloat(inputs[1].value) || 0;
+  const price = parseFloat(inputs[2].value) || 0;
+  inputs[3].value = qty * price;
+  calcTotals();
+};
+
+// 合計を計算
+window.calcTotals = function() {
+  const rows = document.querySelectorAll('#itemsBody tr');
+  let subtotal = 0;
+  rows.forEach(row => {
+    const amountInput = row.querySelectorAll('input')[3];
+    subtotal += parseFloat(amountInput?.value) || 0;
+  });
+  const tax = Math.floor(subtotal * 0.1);
+  const grand = subtotal + tax;
+
+  document.getElementById('subtotal').textContent = '¥' + subtotal.toLocaleString();
+  document.getElementById('tax').textContent = '¥' + tax.toLocaleString();
+  document.getElementById('grandTotal').textContent = '¥' + grand.toLocaleString();
+};
+
+// 行を削除
+window.deleteRow = function(id) {
+  const row = document.getElementById(id);
+  if (row) {
+    row.remove();
+    calcTotals();
+  }
+};
+
+// エラー表示
+function showError(msg) {
+  document.getElementById('headerTitle').textContent = 'エラー';
+  document.getElementById('mainBody').innerHTML =
+    `<div class="error-box">${msg}</div>`;
+}
+
+init();
+</script>
+
+</body>
+</html>
