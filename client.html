@@ -213,11 +213,9 @@ body {
 }
 .date-input:focus { border-color: var(--accent); }
 </style>
-<!-- PDF出力用ライブラリ -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- Excel出力用ライブラリ -->
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script></head>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
 <body>
 
 <div class="header">
@@ -420,10 +418,7 @@ window.exportExcel = function() {
   const dateStr = document.getElementById('workDate')?.value || todayStr();
   const name = document.getElementById('headerTitle')?.textContent || 'document';
 
-  // ヘッダー行
   const data = [['サービス名', '数量', '単価（円）', '金額（円）']];
-
-  // 明細行
   rows.forEach(row => {
     const inputs = row.querySelectorAll('input');
     data.push([
@@ -434,56 +429,82 @@ window.exportExcel = function() {
     ]);
   });
 
-  // 合計行
-  const subtotalEl = document.getElementById('subtotal');
-  const taxEl = document.getElementById('tax');
-  const grandEl = document.getElementById('grandTotal');
-  data.push([]);  // 空行
-  data.push(['', '', '小計', subtotalEl?.textContent || '']);
-  data.push(['', '', '消費税（10%）', taxEl?.textContent || '']);
-  data.push(['', '', '合計', grandEl?.textContent || '']);
+  const toNum = id => parseInt((document.getElementById(id)?.textContent || '0').replace(/[¥,]/g, '')) || 0;
+  data.push([]);
+  data.push(['', '', '小計', '¥' + toNum('subtotal').toLocaleString()]);
+  data.push(['', '', '消費税（10%）', '¥' + toNum('tax').toLocaleString()]);
+  data.push(['', '', '合計', '¥' + toNum('grandTotal').toLocaleString()]);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
-
-  // 列幅を設定
   ws['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
-
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '明細');
-
-  // ファイル名：クライアント名_日付.xlsx
   XLSX.writeFile(wb, `${name}_${dateStr}.xlsx`);
 };
 
-  // PDF出力
+  // PDF出力（Cloud Run + Puppeteer）
+const PDF_SERVER = 'https://invoice-pdf-server-682338340449.asia-northeast1.run.app';
+
 window.exportPDF = async function() {
-  const { jsPDF } = window.jspdf;
+  const btn = document.querySelector('.btn-primary');
+  btn.textContent = 'PDF生成中...';
+  btn.disabled = true;
 
-  // PDF化する範囲（明細カードと合計）
-  const target = document.getElementById('mainBody');
+  try {
+    // 明細データを収集
+    const rows = document.querySelectorAll('#itemsBody tr');
+    const items = [];
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      items.push({
+        service: inputs[0].value,
+        qty:     parseFloat(inputs[1].value) || 0,
+        price:   parseFloat(inputs[2].value) || 0,
+        amount:  parseFloat(inputs[3].value) || 0,
+      });
+    });
 
-  // ボタンエリアを一時的に隠す
-  const actions = document.querySelector('.actions');
-  actions.style.display = 'none';
+    const clientName = document.getElementById('headerTitle')?.textContent?.replace(' 様', '') || '';
+    const workDate   = document.getElementById('workDate')?.value || todayStr();
 
-  const canvas = await html2canvas(target, { scale: 2, useCORS: true });
+    // 合計値を取得（¥と,を除去して数値化）
+    const toNum = id => parseInt((document.getElementById(id)?.textContent || '0').replace(/[¥,]/g, '')) || 0;
 
-  actions.style.display = '';  // ボタンを戻す
+    const payload = {
+      clientName,
+      workDate,
+      items,
+      subtotal:   toNum('subtotal'),
+      tax:        toNum('tax'),
+      grandTotal: toNum('grandTotal'),
+    };
 
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF('p', 'mm', 'a4');
+    const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth - 20;  // 左右10mmずつ余白
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'サーバーエラー');
+    }
 
-  pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, Math.min(imgHeight, pageHeight - 20));
+    // PDFをダウンロード
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `${clientName}_${workDate}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
 
-  // ファイル名：クライアント名_日付.pdf
-  const dateStr = document.getElementById('workDate')?.value || todayStr();
-  const name = document.getElementById('headerTitle')?.textContent || 'document';
-  pdf.save(`${name}_${dateStr}.pdf`);
+  } catch(e) {
+    alert('PDF生成に失敗しました：' + e.message);
+  } finally {
+    btn.textContent = 'PDF出力';
+    btn.disabled = false;
+  }
 };
 </script>
 
