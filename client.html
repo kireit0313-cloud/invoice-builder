@@ -216,7 +216,8 @@ body {
 <!-- PDF出力用ライブラリ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-</head>
+<!-- Excel出力用ライブラリ -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script></head>
 <body>
 
 <div class="header">
@@ -323,7 +324,7 @@ function buildUI(client) {
 
     <!-- アクションボタン -->
     <div class="actions">
-      <button class="btn btn-secondary" onclick="alert('Excel出力は準備中です')">Excelで保存</button>
+      <button class="btn btn-secondary" onclick="exportExcel()">Excelで保存</button>
       <button class="btn btn-primary" onclick="exportPDF()">PDF出力</button>
     </div>
   `;
@@ -413,6 +414,47 @@ function showError(msg) {
 }
 
 init();
+  // Excel出力
+window.exportExcel = function() {
+  const rows = document.querySelectorAll('#itemsBody tr');
+  const dateStr = document.getElementById('workDate')?.value || todayStr();
+  const name = document.getElementById('headerTitle')?.textContent || 'document';
+
+  // ヘッダー行
+  const data = [['サービス名', '数量', '単価（円）', '金額（円）']];
+
+  // 明細行
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    data.push([
+      inputs[0].value,
+      parseFloat(inputs[1].value) || 0,
+      parseFloat(inputs[2].value) || 0,
+      parseFloat(inputs[3].value) || 0,
+    ]);
+  });
+
+  // 合計行
+  const subtotalEl = document.getElementById('subtotal');
+  const taxEl = document.getElementById('tax');
+  const grandEl = document.getElementById('grandTotal');
+  data.push([]);  // 空行
+  data.push(['', '', '小計', subtotalEl?.textContent || '']);
+  data.push(['', '', '消費税（10%）', taxEl?.textContent || '']);
+  data.push(['', '', '合計', grandEl?.textContent || '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // 列幅を設定
+  ws['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '明細');
+
+  // ファイル名：クライアント名_日付.xlsx
+  XLSX.writeFile(wb, `${name}_${dateStr}.xlsx`);
+};
+
   // PDF出力
 window.exportPDF = async function() {
   const { jsPDF } = window.jspdf;
