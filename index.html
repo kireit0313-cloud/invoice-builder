@@ -305,6 +305,60 @@ window.signInWithGoogle = async () => {
 window.signOut = async () => {
   await fbSignOut(auth);
 };
+  // ========== ステップ6：Excel読み込み ==========
+
+// ファイルが選択されたときに発動
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // SheetJSでExcelを読み込む
+  const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs");
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  // 最初のシートを取得
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  // 1行目のヘッダーだけ取得
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  const headers = rows[0] || [];
+
+  // 列テーブルを表示
+  showColumnsTable(headers);
+});
+
+// 列名から種類を自動判定する関数
+function detectType(colName) {
+  const name = colName.toString().toLowerCase();
+  if (/品名|商品名|内容|item/.test(name))   return 'テキスト入力';
+  if (/数量|個数|qty|count/.test(name))     return '数値入力';
+  if (/単価|金額|price|amount/.test(name))  return '金額入力（カンマ区切り）';
+  if (/日付|date/.test(name))              return '日付ピッカー';
+  if (/備考|メモ|note|remark/.test(name))  return '複数行テキスト';
+  return 'テキスト入力';  // 判定できなければテキスト入力にする
+}
+
+// テーブルに列を表示する関数
+function showColumnsTable(headers) {
+  const tbody = document.getElementById('colsBody');
+  tbody.innerHTML = '';  // 一旦クリア
+
+  headers.forEach(header => {
+    const type = detectType(header);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${header}</td>
+      <td>${type}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // テーブルと保存ボタンを表示、ヒントを非表示に
+  document.getElementById('colsCard').style.display = 'block';
+  document.getElementById('saveBtn').style.display = 'block';
+  document.getElementById('hintMsg').style.display = 'none';
+}
 </script>
 
 </body>
