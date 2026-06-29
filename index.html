@@ -186,6 +186,45 @@ body {
 .client-input:focus {
   border-color: var(--accent);
 }
+
+/* クライアント一覧 */
+.client-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.client-list-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--border);
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.client-list-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  vertical-align: middle;
+}
+.copy-url-btn {
+  padding: 6px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.copy-url-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.copy-url-btn.copied {
+  border-color: #10B981;
+  color: #10B981;
+}
 </style>
 </head>
 <body>
@@ -259,6 +298,23 @@ body {
       設定を保存する
     </button>
 
+    <!-- ④クライアント一覧カード -->
+    <div class="card">
+      <p class="card-title">④ 登録済みクライアント一覧</p>
+      <table class="client-list-table">
+        <thead>
+          <tr>
+            <th>クライアント名</th>
+            <th>登録日</th>
+            <th>専用URL</th>
+          </tr>
+        </thead>
+        <tbody id="clientListBody">
+          <tr><td colspan="3" style="color:var(--ink-soft);padding:1rem 10px;">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- アップロード前のヒント -->
     <p class="hint" id="hintMsg">
       Excelファイルをアップロードすると、列が自動で判定されます
@@ -271,7 +327,7 @@ body {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, serverTimestamp }
+import { getFirestore, doc, setDoc, serverTimestamp, collection, getDocs, orderBy, query }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -293,6 +349,7 @@ onAuthStateChanged(auth, user => {
   if (user) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
+    loadClientList();
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -406,6 +463,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     });
 
     alert(`保存しました！\nクライアント名：${clientName}\nID：${clientId}`);
+    loadClientList();
     saveBtn.textContent = '設定を保存する';
     saveBtn.disabled = false;
   } catch(e) {
@@ -414,6 +472,54 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     document.getElementById('saveBtn').disabled = false;
   }
 });
+
+// ========== クライアント一覧 ==========
+
+async function loadClientList() {
+  const tbody = document.getElementById('clientListBody');
+  try {
+    const q = query(collection(db, 'clients'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--ink-soft);padding:1rem 10px;">まだ登録されていません</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    snap.forEach(docSnap => {
+      const d = docSnap.data();
+      const date = d.createdAt?.toDate
+        ? d.createdAt.toDate().toLocaleDateString('ja-JP')
+        : '—';
+      const url = `${location.origin}/client.html?id=${encodeURIComponent(d.clientId)}`;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${d.clientName}</td>
+        <td style="color:var(--ink-soft)">${date}</td>
+        <td>
+          <button class="copy-url-btn" onclick="copyUrl(this, '${url}')">
+            URLをコピー
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:red">読み込みエラー: ${e.message}</td></tr>`;
+  }
+}
+
+window.copyUrl = function(btn, url) {
+  navigator.clipboard.writeText(url).then(() => {
+    btn.textContent = 'コピーしました！';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'URLをコピー';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+};
 
 </script>
 
