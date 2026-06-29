@@ -213,6 +213,9 @@ body {
 }
 .date-input:focus { border-color: var(--accent); }
 </style>
+<!-- PDF出力用ライブラリ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -321,7 +324,7 @@ function buildUI(client) {
     <!-- アクションボタン -->
     <div class="actions">
       <button class="btn btn-secondary" onclick="alert('Excel出力は準備中です')">Excelで保存</button>
-      <button class="btn btn-primary" onclick="alert('PDF出力は準備中です')">PDF出力</button>
+      <button class="btn btn-primary" onclick="exportPDF()">PDF出力</button>
     </div>
   `;
 
@@ -410,6 +413,36 @@ function showError(msg) {
 }
 
 init();
+  // PDF出力
+window.exportPDF = async function() {
+  const { jsPDF } = window.jspdf;
+
+  // PDF化する範囲（明細カードと合計）
+  const target = document.getElementById('mainBody');
+
+  // ボタンエリアを一時的に隠す
+  const actions = document.querySelector('.actions');
+  actions.style.display = 'none';
+
+  const canvas = await html2canvas(target, { scale: 2, useCORS: true });
+
+  actions.style.display = '';  // ボタンを戻す
+
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF('p', 'mm', 'a4');
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth - 20;  // 左右10mmずつ余白
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, Math.min(imgHeight, pageHeight - 20));
+
+  // ファイル名：クライアント名_日付.pdf
+  const dateStr = document.getElementById('workDate')?.value || todayStr();
+  const name = document.getElementById('headerTitle')?.textContent || 'document';
+  pdf.save(`${name}_${dateStr}.pdf`);
+};
 </script>
 
 </body>
