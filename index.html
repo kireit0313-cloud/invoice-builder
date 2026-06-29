@@ -70,18 +70,9 @@ body {
   display: none;
   min-height: 100dvh;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-}
-.welcome {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--ink);
-}
-.welcome-sub {
-  font-size: 13px;
-  color: var(--ink-soft);
+  align-items: stretch;
+  justify-content: flex-start;
+  background: var(--bg);
 }
 .logout-btn {
   padding: 8px 20px;
@@ -92,12 +83,6 @@ body {
   font-size: 13px;
   font-family: 'Noto Sans JP', sans-serif;
   color: var(--ink-soft);
-}
-  /* 管理画面レイアウト */
-#app {
-  align-items: stretch !important;
-  justify-content: flex-start !important;
-  background: var(--bg);
 }
 .admin-header {
   background: var(--surface);
@@ -188,6 +173,19 @@ body {
   text-align: center;
   padding: 1.5rem;
 }
+.client-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.client-input:focus {
+  border-color: var(--accent);
+}
 </style>
 </head>
 <body>
@@ -221,11 +219,18 @@ body {
   <!-- メインコンテンツ -->
   <div class="admin-body">
 
-    <!-- Excelアップロードカード -->
+    <!-- ①クライアント名入力カード -->
     <div class="card">
-      <p class="card-title">① Excelテンプレートをアップロード</p>
+      <p class="card-title">① クライアント名を入力</p>
+      <input type="text" id="clientName" class="client-input"
+        placeholder="例：藤田クリーニング様">
+    </div>
+
+    <!-- ②Excelアップロードカード -->
+    <div class="card">
+      <p class="card-title">② Excelテンプレートをアップロード</p>
       <div class="upload-area">
-        <div>📁 Excelファイル（.xlsx）をここに選択</div>
+        <div>📁 Excelファイルをここに選択</div>
         <div style="font-size:11px; margin-top:4px;">対応形式：.xlsx / .xls</div>
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
           ファイルを選択
@@ -234,9 +239,9 @@ body {
       </div>
     </div>
 
-    <!-- 列確認テーブルカード（初期は非表示） -->
+    <!-- ③列確認テーブルカード（初期は非表示） -->
     <div class="card" id="colsCard" style="display:none">
-      <p class="card-title">② 列の種類を確認・修正</p>
+      <p class="card-title">③ 列の種類を確認・修正</p>
       <table class="cols-table">
         <thead>
           <tr>
@@ -245,7 +250,6 @@ body {
           </tr>
         </thead>
         <tbody id="colsBody">
-          <!-- JavaScriptで行を追加予定 -->
         </tbody>
       </table>
     </div>
@@ -267,6 +271,8 @@ body {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyATf8RjZ7y_wjiiPJ1VR9KXktbDPXuMpFo",
@@ -279,6 +285,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 // ログイン状態を監視
@@ -286,7 +293,6 @@ onAuthStateChanged(auth, user => {
   if (user) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    document.getElementById('welcomeName').textContent = user.displayName + ' さん、こんにちは';
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -305,31 +311,25 @@ window.signInWithGoogle = async () => {
 window.signOut = async () => {
   await fbSignOut(auth);
 };
-  // ========== ステップ6：Excel読み込み ==========
 
-// ファイルが選択されたときに発動
+// ========== ステップ6：Excel読み込み ==========
+
 document.getElementById('fileInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  // SheetJSでExcelを読み込む
   const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs");
   const buffer = await file.arrayBuffer();
   const data = new Uint8Array(buffer);
   const workbook = XLSX.read(data, { type: 'array' });
 
-  // 最初のシートを取得
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-  // 1行目のヘッダーだけ取得
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
   const headers = rows[0] || [];
 
-  // 列テーブルを表示
   showColumnsTable(headers);
 });
 
-// 列名から種類を自動判定する関数
 function detectType(colName) {
   const name = colName.toString().toLowerCase();
   if (/品名|商品名|内容|item/.test(name))   return 'テキスト入力';
@@ -337,13 +337,12 @@ function detectType(colName) {
   if (/単価|金額|price|amount/.test(name))  return '金額入力（カンマ区切り）';
   if (/日付|date/.test(name))              return '日付ピッカー';
   if (/備考|メモ|note|remark/.test(name))  return '複数行テキスト';
-  return 'テキスト入力';  // 判定できなければテキスト入力にする
+  return 'テキスト入力';
 }
 
-// テーブルに列を表示する関数
 function showColumnsTable(headers) {
   const tbody = document.getElementById('colsBody');
-  tbody.innerHTML = '';  // 一旦クリア
+  tbody.innerHTML = '';
 
   headers.forEach(header => {
     const type = detectType(header);
@@ -355,11 +354,67 @@ function showColumnsTable(headers) {
     tbody.appendChild(tr);
   });
 
-  // テーブルと保存ボタンを表示、ヒントを非表示に
   document.getElementById('colsCard').style.display = 'block';
   document.getElementById('saveBtn').style.display = 'block';
   document.getElementById('hintMsg').style.display = 'none';
 }
+
+// ========== ステップ7：Firestoreに保存 ==========
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const clientName = document.getElementById('clientName').value.trim();
+  if (!clientName) {
+    alert('① クライアント名を入力してください');
+    return;
+  }
+
+  const rows = document.querySelectorAll('#colsBody tr');
+  if (rows.length === 0) {
+    alert('② Excelファイルをアップロードしてください');
+    return;
+  }
+
+  // 列設定を配列にまとめる
+  const columns = [];
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    columns.push({
+      name: cells[0].textContent,
+      type: cells[1].textContent
+    });
+  });
+
+  // クライアントIDを生成（英数字・日本語のみ、最大30文字）
+  const clientId = clientName
+    .replace(/\s+/g, '_')
+    .replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '')
+    .substring(0, 30);
+
+  try {
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.textContent = '保存中...';
+    saveBtn.disabled = true;
+
+    const user = auth.currentUser;
+    await setDoc(doc(db, 'clients', clientId), {
+      clientName: clientName,
+      clientId: clientId,
+      columns: columns,
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    alert(`保存しました！\nクライアント名：${clientName}\nID：${clientId}`);
+    saveBtn.textContent = '設定を保存する';
+    saveBtn.disabled = false;
+  } catch(e) {
+    alert('保存に失敗しました：' + e.message);
+    document.getElementById('saveBtn').textContent = '設定を保存する';
+    document.getElementById('saveBtn').disabled = false;
+  }
+});
+
 </script>
 
 </body>
