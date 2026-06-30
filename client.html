@@ -592,6 +592,7 @@ window.exportPDF = async function() {
       items,
       docType: currentClient?.docType || '請求書',
       companyInfo: currentClient?.companyInfo || null,
+      projectFields: currentClient?.projectFields || [],
     };
 
     const res = await fetch(`${PDF_SERVER}/generate-pdf`, {

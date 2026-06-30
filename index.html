@@ -272,8 +272,7 @@ body {
     <!-- ①クライアント名入力カード -->
     <div class="card">
       <p class="card-title">① クライアント名を入力</p>
-      <input type="text" id="clientName" class="client-input"
-        placeholder="例：藤田クリーニング様">
+      <input type="text" id="clientName" class="client-input">
     </div>
 
     <!-- 会社情報・書類設定カード -->
@@ -292,32 +291,31 @@ body {
 
       <label style="font-size:12px;color:var(--ink-soft);">会社名（屋号）</label>
       <input type="text" id="companyName" class="client-input"
-        placeholder="例：株式会社○○" style="margin-bottom:10px;">
+        style="margin-bottom:10px;">
 
       <label style="font-size:12px;color:var(--ink-soft);">住所</label>
       <input type="text" id="companyAddress" class="client-input"
-        placeholder="例：東京都〇〇区〇〇1-2-3" style="margin-bottom:10px;">
+        style="margin-bottom:10px;">
 
       <label style="font-size:12px;color:var(--ink-soft);">電話番号</label>
       <input type="text" id="companyTel" class="client-input"
-        placeholder="例：03-1234-5678" style="margin-bottom:10px;">
+        style="margin-bottom:10px;">
 
       <label style="font-size:12px;color:var(--ink-soft);">インボイス登録番号</label>
       <input type="text" id="invoiceNumber" class="client-input"
-        placeholder="例：T1234567890123" style="margin-bottom:10px;">
+        style="margin-bottom:10px;">
 
       <div id="bankInfoArea">
         <label style="font-size:12px;color:var(--ink-soft);">振込先（銀行名・支店名・口座種別・口座番号・名義など）</label>
         <textarea id="bankInfo" class="client-input" rows="3"
-          placeholder="例：〇〇銀行 〇〇支店 普通 1234567 カ）〇〇"
           style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
       </div>
 
       <label style="font-size:12px;color:var(--ink-soft);display:block;margin-top:14px;">
-        その他記載事項（業種に応じて自由に追加できます）
+        会社情報に関する追加項目（業種に応じて自由に追加できます）
       </label>
       <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px;">
-        例：建設業許可番号、宅地建物取引業免許番号、保有資格など。PDFの会社情報欄に「項目名：内容」の形で追加されます。
+        建設業許可番号や保有資格など、自社に関する情報用です。PDFの会社情報欄にまとめて表示されます。
       </p>
       <div id="customFieldsArea"></div>
       <button type="button" class="upload-btn" id="addCustomFieldBtn"
@@ -326,6 +324,17 @@ body {
       <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">
         この情報はクライアントごとに保存され、PDF出力時に自動で差し込まれます。クライアントが変更したり目にすることはありません。
       </p>
+    </div>
+
+    <!-- 案件情報・送付先情報カード（会社情報とは独立） -->
+    <div class="card">
+      <p class="card-title">案件情報・送付先情報（自由項目）</p>
+      <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 10px;">
+        工事先住所、送付先住所など、会社情報とは関連しない項目用です。PDFの会社情報欄とは別の場所に、独立した形で表示されます。
+      </p>
+      <div id="projectFieldsArea"></div>
+      <button type="button" class="upload-btn" id="addProjectFieldBtn"
+        style="margin-top:6px;">＋ 項目を追加</button>
     </div>
 
     <!-- デフォルト税率設定カード -->
@@ -549,6 +558,17 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     customFields: customFields,
   };
 
+  // 案件情報・送付先情報（会社情報とは独立）
+  const projectFields = [];
+  document.querySelectorAll('#projectFieldsArea .project-field-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const label = inputs[0].value.trim();
+    const value = inputs[1].value.trim();
+    if (label && value) {
+      projectFields.push({ label, value });
+    }
+  });
+
   try {
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.textContent = '保存中...';
@@ -562,6 +582,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       defaultTaxRate: defaultTaxRate,
       docType: docType,
       companyInfo: companyInfo,
+      projectFields: projectFields,
       createdBy: user.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -634,9 +655,9 @@ function addCustomFieldRow(label = '', value = '') {
   row.className = 'custom-field-row';
   row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
   row.innerHTML = `
-    <input type="text" placeholder="項目名（例：建設業許可番号）" class="client-input"
+    <input type="text" class="client-input"
       style="flex:1;margin-bottom:0;" value="${label.replace(/"/g, '&quot;')}">
-    <input type="text" placeholder="内容（例：東京都知事許可（般-1）第12345号）" class="client-input"
+    <input type="text" class="client-input"
       style="flex:1.5;margin-bottom:0;" value="${value.replace(/"/g, '&quot;')}">
     <button type="button" class="delete-field-btn">×</button>
   `;
@@ -645,6 +666,26 @@ function addCustomFieldRow(label = '', value = '') {
 }
 
 document.getElementById('addCustomFieldBtn').addEventListener('click', () => addCustomFieldRow());
+
+// ========== 案件情報・送付先情報（会社情報とは独立した自由項目） ==========
+
+function addProjectFieldRow(label = '', value = '') {
+  const area = document.getElementById('projectFieldsArea');
+  const row = document.createElement('div');
+  row.className = 'project-field-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
+  row.innerHTML = `
+    <input type="text" class="client-input"
+      style="flex:1;margin-bottom:0;" value="${label.replace(/"/g, '&quot;')}">
+    <input type="text" class="client-input"
+      style="flex:1.5;margin-bottom:0;" value="${value.replace(/"/g, '&quot;')}">
+    <button type="button" class="delete-field-btn">×</button>
+  `;
+  row.querySelector('.delete-field-btn').addEventListener('click', () => row.remove());
+  area.appendChild(row);
+}
+
+document.getElementById('addProjectFieldBtn').addEventListener('click', () => addProjectFieldRow());
 
 // 書類タイプ切替で振込先欄の表示・非表示を切り替え
 function toggleBankInfoVisibility() {
