@@ -269,7 +269,7 @@ body {
     <div class="card">
       <p class="card-title">デフォルト税率（%）</p>
       <input type="number" id="defaultTaxRate" class="client-input"
-        value="10" min="0" step="0.1" autocomplete="off"
+        value="10" min="0" step="1" autocomplete="off"
         style="max-width:120px">
       <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">
         クライアント専用画面で明細を入力する際、税率欄に最初から入る数値です。お客様に合わせて変更してください（例：軽減税率が多い場合は8、非課税中心の場合は0など）。
@@ -460,7 +460,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
   // デフォルト税率（未入力の場合は10%）
   const defaultTaxRateInput = document.getElementById('defaultTaxRate').value;
-  const defaultTaxRate = defaultTaxRateInput === '' ? 10 : (parseFloat(defaultTaxRateInput) || 0);
+  const defaultTaxRate = defaultTaxRateInput === '' ? 10 : (parseInt(defaultTaxRateInput) || 0);
 
   try {
     const saveBtn = document.getElementById('saveBtn');

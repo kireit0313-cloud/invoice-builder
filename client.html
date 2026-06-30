@@ -382,7 +382,7 @@ window.addRow = function() {
         oninput="calcTotals()">
     </td>
     <td class="col-tax">
-      <input type="number" placeholder="10" min="0" step="0.1" autocomplete="off"
+      <input type="number" placeholder="10" min="0" step="1" autocomplete="off"
         id="${id}_tax" oninput="calcTotals()">
       <div class="tax-presets">
         <button type="button" onclick="setTaxRate('${id}', 10)">10%</button>
@@ -446,7 +446,7 @@ function buildTaxGroups() {
   rows.forEach(row => {
     const f = rowInputs(row);
     const amount = parseFloat(f.amount.value) || 0;
-    const rate = f.taxRate.value === '' ? 0 : (parseFloat(f.taxRate.value) || 0);
+    const rate = f.taxRate.value === '' ? 0 : (parseInt(f.taxRate.value) || 0);
     groups.set(rate, (groups.get(rate) || 0) + amount);
   });
   // 税率の高い順に並べる（0%は最後）
@@ -531,7 +531,7 @@ window.exportExcel = function() {
       f.qty.value === '' ? '' : parseFloat(f.qty.value) || 0,
       f.price.value === '' ? '' : parseFloat(f.price.value) || 0,
       parseFloat(f.amount.value) || 0,
-      f.taxRate.value === '' ? 0 : parseFloat(f.taxRate.value) || 0,
+      f.taxRate.value === '' ? 0 : parseInt(f.taxRate.value) || 0,
       f.remark.value,
     ]);
   });
@@ -578,7 +578,7 @@ window.exportPDF = async function() {
         qty:      f.qty.value === '' ? null : parseFloat(f.qty.value) || 0,
         price:    f.price.value === '' ? null : parseFloat(f.price.value) || 0,
         amount:   parseFloat(f.amount.value) || 0,
-        taxRate:  f.taxRate.value === '' ? 0 : parseFloat(f.taxRate.value) || 0,
+        taxRate:  f.taxRate.value === '' ? 0 : parseInt(f.taxRate.value) || 0,
         remark:   f.remark.value,
       });
     });
