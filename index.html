@@ -139,6 +139,17 @@ body {
   font-size: 14px;
   font-family: 'Noto Sans JP', sans-serif;
 }
+.delete-field-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.delete-field-btn:hover { color: var(--danger); }
 .cols-table {
   width: 100%;
   border-collapse: collapse;
@@ -295,10 +306,22 @@ body {
       <input type="text" id="invoiceNumber" class="client-input"
         placeholder="例：T1234567890123" style="margin-bottom:10px;">
 
-      <label style="font-size:12px;color:var(--ink-soft);">振込先（銀行名・支店名・口座種別・口座番号・名義など）</label>
-      <textarea id="bankInfo" class="client-input" rows="3"
-        placeholder="例：〇〇銀行 〇〇支店 普通 1234567 カ）〇〇"
-        style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
+      <div id="bankInfoArea">
+        <label style="font-size:12px;color:var(--ink-soft);">振込先（銀行名・支店名・口座種別・口座番号・名義など）</label>
+        <textarea id="bankInfo" class="client-input" rows="3"
+          placeholder="例：〇〇銀行 〇〇支店 普通 1234567 カ）〇〇"
+          style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
+      </div>
+
+      <label style="font-size:12px;color:var(--ink-soft);display:block;margin-top:14px;">
+        その他記載事項（業種に応じて自由に追加できます）
+      </label>
+      <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px;">
+        例：建設業許可番号、宅地建物取引業免許番号、保有資格など。PDFの会社情報欄に「項目名：内容」の形で追加されます。
+      </p>
+      <div id="customFieldsArea"></div>
+      <button type="button" class="upload-btn" id="addCustomFieldBtn"
+        style="margin-top:6px;">＋ 項目を追加</button>
 
       <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">
         この情報はクライアントごとに保存され、PDF出力時に自動で差し込まれます。クライアントが変更したり目にすることはありません。
@@ -507,12 +530,23 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const docType = docTypeInput ? docTypeInput.value : '請求書';
 
   // 会社情報（固定情報）
+  const customFields = [];
+  document.querySelectorAll('#customFieldsArea .custom-field-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const label = inputs[0].value.trim();
+    const value = inputs[1].value.trim();
+    if (label && value) {
+      customFields.push({ label, value });
+    }
+  });
+
   const companyInfo = {
     name: document.getElementById('companyName').value.trim(),
     address: document.getElementById('companyAddress').value.trim(),
     tel: document.getElementById('companyTel').value.trim(),
     invoiceNumber: document.getElementById('invoiceNumber').value.trim(),
     bankInfo: document.getElementById('bankInfo').value.trim(),
+    customFields: customFields,
   };
 
   try {
@@ -591,6 +625,41 @@ window.copyUrl = function(btn, url) {
     }, 2000);
   });
 };
+
+// ========== その他記載事項（自由追加項目） ==========
+
+function addCustomFieldRow(label = '', value = '') {
+  const area = document.getElementById('customFieldsArea');
+  const row = document.createElement('div');
+  row.className = 'custom-field-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
+  row.innerHTML = `
+    <input type="text" placeholder="項目名（例：建設業許可番号）" class="client-input"
+      style="flex:1;margin-bottom:0;" value="${label.replace(/"/g, '&quot;')}">
+    <input type="text" placeholder="内容（例：東京都知事許可（般-1）第12345号）" class="client-input"
+      style="flex:1.5;margin-bottom:0;" value="${value.replace(/"/g, '&quot;')}">
+    <button type="button" class="delete-field-btn">×</button>
+  `;
+  row.querySelector('.delete-field-btn').addEventListener('click', () => row.remove());
+  area.appendChild(row);
+}
+
+document.getElementById('addCustomFieldBtn').addEventListener('click', () => addCustomFieldRow());
+
+// 書類タイプ切替で振込先欄の表示・非表示を切り替え
+function toggleBankInfoVisibility() {
+  const checked = document.querySelector('input[name="docType"]:checked');
+  const bankArea = document.getElementById('bankInfoArea');
+  if (checked && checked.value === '見積書') {
+    bankArea.style.display = 'none';
+  } else {
+    bankArea.style.display = 'block';
+  }
+}
+document.querySelectorAll('input[name="docType"]').forEach(radio => {
+  radio.addEventListener('change', toggleBankInfoVisibility);
+});
+toggleBankInfoVisibility();
 
 </script>
 

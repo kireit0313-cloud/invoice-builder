@@ -247,7 +247,7 @@ body {
 <div class="header">
   <div>
     <div class="header-title" id="headerTitle">読み込み中...</div>
-    <div class="header-sub">見積書・請求書入力</div>
+    <div class="header-sub" id="headerSub">見積書・請求書入力</div>
   </div>
 </div>
 
@@ -304,7 +304,9 @@ let currentClient = null;
 function buildUI(client) {
   currentClient = client;
   document.getElementById('headerTitle').textContent = client.clientName + ' 様';
-  document.title = client.clientName + ' 様 | 見積書・請求書入力';
+  const docTypeLabel = client.docType === '見積書' ? '見積書' : '請求書';
+  document.getElementById('headerSub').textContent = docTypeLabel + '入力';
+  document.title = client.clientName + ' 様 | ' + docTypeLabel + '入力';
 
   const body = document.getElementById('mainBody');
   body.innerHTML = `
