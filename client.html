@@ -297,8 +297,12 @@ async function init() {
   }
 }
 
+// 読み込んだクライアント設定（デフォルト税率などに使用）
+let currentClient = null;
+
 // UI構築
 function buildUI(client) {
+  currentClient = client;
   document.getElementById('headerTitle').textContent = client.clientName + ' 様';
   document.title = client.clientName + ' 様 | 見積書・請求書入力';
 
@@ -394,7 +398,10 @@ window.addRow = function() {
     </td>
   `;
   document.getElementById('itemsBody').appendChild(tr);
-  document.getElementById(id + '_tax').value = 10;
+  const defaultRate = (currentClient && currentClient.defaultTaxRate !== undefined && currentClient.defaultTaxRate !== null)
+    ? currentClient.defaultTaxRate
+    : 10;
+  document.getElementById(id + '_tax').value = defaultRate;
   calcTotals();
 };
 
