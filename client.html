@@ -44,7 +44,7 @@ body {
 }
 .body {
   padding: 2rem 1.5rem;
-  max-width: 800px;
+  max-width: 960px;
   width: 100%;
   margin: 0 auto;
   display: flex;
@@ -65,8 +65,13 @@ body {
 }
 
 /* 明細テーブル */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
 .items-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -99,10 +104,12 @@ body {
 .items-table input[type="number"] {
   text-align: right;
 }
-.col-service { width: 35%; }
-.col-qty     { width: 10%; }
-.col-price   { width: 18%; }
-.col-amount  { width: 18%; }
+.col-date    { width: 14%; }
+.col-service { width: 24%; }
+.col-qty     { width: 8%; }
+.col-price   { width: 13%; }
+.col-amount  { width: 13%; }
+.col-remark  { width: 22%; }
 .col-delete  { width: 6%; text-align: center; }
 
 .delete-btn {
@@ -200,18 +207,12 @@ body {
   font-size: 14px;
 }
 
-/* 日付入力 */
-.date-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 14px;
-  font-family: 'Noto Sans JP', sans-serif;
-  color: var(--ink);
-  outline: none;
+/* 補足テキスト */
+.hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 0.5rem;
 }
-.date-input:focus { border-color: var(--accent); }
 </style>
 <!-- Excel出力用ライブラリ -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -278,29 +279,27 @@ function buildUI(client) {
 
   const body = document.getElementById('mainBody');
   body.innerHTML = `
-    <!-- 作業日カード -->
-    <div class="card">
-      <p class="card-title">作業日</p>
-      <input type="date" class="date-input" id="workDate"
-        value="${todayStr()}">
-    </div>
-
     <!-- 明細入力カード -->
     <div class="card">
       <p class="card-title">明細を入力</p>
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th class="col-service">サービス名</th>
-            <th class="col-qty">数量</th>
-            <th class="col-price">単価（円）</th>
-            <th class="col-amount">金額（円）</th>
-            <th class="col-delete"></th>
-          </tr>
-        </thead>
-        <tbody id="itemsBody">
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="col-date">作業日</th>
+              <th class="col-service">サービス名</th>
+              <th class="col-qty">数量</th>
+              <th class="col-price">単価（円）</th>
+              <th class="col-amount">金額（円）</th>
+              <th class="col-remark">備考</th>
+              <th class="col-delete"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">作業日は「6/2」のような単日でも「6/2〜6/4」のような期間でも入力できます。数量と単価を入れると金額が自動計算されます。日割りできない場合は数量・単価を空欄のまま金額欄に直接金額を入力してください。</p>
       <button class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
 
       <!-- 合計 -->
@@ -344,21 +343,26 @@ window.addRow = function() {
   const tr = document.createElement('tr');
   tr.id = id;
   tr.innerHTML = `
+    <td class="col-date">
+      <input type="text" placeholder="例：6/2 や 6/2〜6/4">
+    </td>
     <td class="col-service">
-      <input type="text" placeholder="例：エアコン洗浄"
-        oninput="calcRow('${id}')">
+      <input type="text" placeholder="例：エアコン洗浄">
     </td>
     <td class="col-qty">
-      <input type="number" value="1" min="0"
-        oninput="calcRow('${id}'); calcTotals()">
+      <input type="number" placeholder="" min="0"
+        oninput="calcRow('${id}')">
     </td>
     <td class="col-price">
-      <input type="number" value="0" min="0"
-        oninput="calcRow('${id}'); calcTotals()">
+      <input type="number" placeholder="" min="0"
+        oninput="calcRow('${id}')">
     </td>
     <td class="col-amount">
-      <input type="number" value="0" readonly
-        style="background:var(--bg); color:var(--ink-soft)">
+      <input type="number" placeholder="0" min="0"
+        oninput="calcTotals()">
+    </td>
+    <td class="col-remark">
+      <input type="text" placeholder="">
     </td>
     <td class="col-delete">
       <button class="delete-btn" onclick="deleteRow('${id}')">×</button>
@@ -368,14 +372,29 @@ window.addRow = function() {
   calcTotals();
 };
 
-// 行の金額を計算
+// 行の入力欄を名前で取得
+function rowInputs(row) {
+  const inputs = row.querySelectorAll('input');
+  return {
+    date: inputs[0],
+    service: inputs[1],
+    qty: inputs[2],
+    price: inputs[3],
+    amount: inputs[4],
+    remark: inputs[5],
+  };
+}
+
+// 数量・単価が両方入力されていれば金額を自動計算
 window.calcRow = function(id) {
   const row = document.getElementById(id);
   if (!row) return;
-  const inputs = row.querySelectorAll('input');
-  const qty = parseFloat(inputs[1].value) || 0;
-  const price = parseFloat(inputs[2].value) || 0;
-  inputs[3].value = qty * price;
+  const f = rowInputs(row);
+  if (f.qty.value !== '' && f.price.value !== '') {
+    const qty = parseFloat(f.qty.value) || 0;
+    const price = parseFloat(f.price.value) || 0;
+    f.amount.value = qty * price;
+  }
   calcTotals();
 };
 
@@ -384,8 +403,8 @@ window.calcTotals = function() {
   const rows = document.querySelectorAll('#itemsBody tr');
   let subtotal = 0;
   rows.forEach(row => {
-    const amountInput = row.querySelectorAll('input')[3];
-    subtotal += parseFloat(amountInput?.value) || 0;
+    const f = rowInputs(row);
+    subtotal += parseFloat(f.amount.value) || 0;
   });
   const tax = Math.floor(subtotal * 0.1);
   const grand = subtotal + tax;
@@ -412,37 +431,39 @@ function showError(msg) {
 }
 
 init();
-  // Excel出力
+
+// Excel出力
 window.exportExcel = function() {
   const rows = document.querySelectorAll('#itemsBody tr');
-  const dateStr = document.getElementById('workDate')?.value || todayStr();
   const name = document.getElementById('headerTitle')?.textContent || 'document';
 
-  const data = [['サービス名', '数量', '単価（円）', '金額（円）']];
+  const data = [['作業日', 'サービス名', '数量', '単価（円）', '金額（円）', '備考']];
   rows.forEach(row => {
-    const inputs = row.querySelectorAll('input');
+    const f = rowInputs(row);
     data.push([
-      inputs[0].value,
-      parseFloat(inputs[1].value) || 0,
-      parseFloat(inputs[2].value) || 0,
-      parseFloat(inputs[3].value) || 0,
+      f.date.value,
+      f.service.value,
+      f.qty.value === '' ? '' : parseFloat(f.qty.value) || 0,
+      f.price.value === '' ? '' : parseFloat(f.price.value) || 0,
+      parseFloat(f.amount.value) || 0,
+      f.remark.value,
     ]);
   });
 
   const toNum = id => parseInt((document.getElementById(id)?.textContent || '0').replace(/[¥,]/g, '')) || 0;
   data.push([]);
-  data.push(['', '', '小計', '¥' + toNum('subtotal').toLocaleString()]);
-  data.push(['', '', '消費税（10%）', '¥' + toNum('tax').toLocaleString()]);
-  data.push(['', '', '合計', '¥' + toNum('grandTotal').toLocaleString()]);
+  data.push(['', '', '', '', '小計', '¥' + toNum('subtotal').toLocaleString()]);
+  data.push(['', '', '', '', '消費税（10%）', '¥' + toNum('tax').toLocaleString()]);
+  data.push(['', '', '', '', '合計', '¥' + toNum('grandTotal').toLocaleString()]);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
+  ws['!cols'] = [{ wch: 14 }, { wch: 26 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 20 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '明細');
-  XLSX.writeFile(wb, `${name}_${dateStr}.xlsx`);
+  XLSX.writeFile(wb, `${name}_${todayStr()}.xlsx`);
 };
 
-  // PDF出力（Cloud Run + Puppeteer）
+// PDF出力（Cloud Run + Puppeteer）
 const PDF_SERVER = 'https://invoice-pdf-server-682338340449.asia-northeast1.run.app';
 
 window.exportPDF = async function() {
@@ -455,24 +476,24 @@ window.exportPDF = async function() {
     const rows = document.querySelectorAll('#itemsBody tr');
     const items = [];
     rows.forEach(row => {
-      const inputs = row.querySelectorAll('input');
+      const f = rowInputs(row);
       items.push({
-        service: inputs[0].value,
-        qty:     parseFloat(inputs[1].value) || 0,
-        price:   parseFloat(inputs[2].value) || 0,
-        amount:  parseFloat(inputs[3].value) || 0,
+        workDate: f.date.value,
+        service:  f.service.value,
+        qty:      f.qty.value === '' ? null : parseFloat(f.qty.value) || 0,
+        price:    f.price.value === '' ? null : parseFloat(f.price.value) || 0,
+        amount:   parseFloat(f.amount.value) || 0,
+        remark:   f.remark.value,
       });
     });
 
     const clientName = document.getElementById('headerTitle')?.textContent?.replace(' 様', '') || '';
-    const workDate   = document.getElementById('workDate')?.value || todayStr();
 
     // 合計値を取得（¥と,を除去して数値化）
     const toNum = id => parseInt((document.getElementById(id)?.textContent || '0').replace(/[¥,]/g, '')) || 0;
 
     const payload = {
       clientName,
-      workDate,
       items,
       subtotal:   toNum('subtotal'),
       tax:        toNum('tax'),
@@ -495,7 +516,7 @@ window.exportPDF = async function() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `${clientName}_${workDate}.pdf`;
+    a.download = `${clientName}_${todayStr()}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
 
