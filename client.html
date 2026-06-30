@@ -44,7 +44,7 @@ body {
 }
 .body {
   padding: 2rem 1.5rem;
-  max-width: 960px;
+  max-width: 1080px;
   width: 100%;
   margin: 0 auto;
   display: flex;
@@ -71,7 +71,7 @@ body {
 }
 .items-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 860px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -104,13 +104,14 @@ body {
 .items-table input[type="number"] {
   text-align: right;
 }
-.col-date    { width: 14%; }
-.col-service { width: 24%; }
-.col-qty     { width: 8%; }
-.col-price   { width: 13%; }
-.col-amount  { width: 13%; }
-.col-remark  { width: 22%; }
-.col-delete  { width: 6%; text-align: center; }
+.col-date    { width: 12%; }
+.col-service { width: 21%; }
+.col-qty     { width: 7%; }
+.col-price   { width: 11%; }
+.col-amount  { width: 11%; }
+.col-tax     { width: 9%; }
+.col-remark  { width: 19%; }
+.col-delete  { width: 5%; text-align: center; }
 
 .delete-btn {
   background: none;
@@ -160,8 +161,11 @@ body {
   font-size: 16px;
   font-weight: 500;
   color: var(--ink);
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 2px;
 }
-.total-label { min-width: 80px; text-align: right; }
+.total-label { min-width: 140px; text-align: right; }
 .total-value { min-width: 100px; text-align: right; }
 
 /* アクションボタン */
@@ -230,6 +234,13 @@ body {
   <div class="loading">データを読み込んでいます...</div>
 </div>
 
+<!-- よく使う税率の候補 -->
+<datalist id="taxRateOptions">
+  <option value="10">
+  <option value="8">
+  <option value="0">
+</datalist>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getFirestore, doc, getDoc }
@@ -291,6 +302,7 @@ function buildUI(client) {
               <th class="col-qty">数量</th>
               <th class="col-price">単価（円）</th>
               <th class="col-amount">金額（円）</th>
+              <th class="col-tax">税率（%）</th>
               <th class="col-remark">備考</th>
               <th class="col-delete"></th>
             </tr>
@@ -299,24 +311,14 @@ function buildUI(client) {
           </tbody>
         </table>
       </div>
-      <p class="hint">作業日は「6/2」のような単日でも「6/2〜6/4」のような期間でも入力できます。数量と単価を入れると金額が自動計算されます。日割りできない場合は数量・単価を空欄のまま金額欄に直接金額を入力してください。</p>
+      <p class="hint">
+        作業日は「6/2」のような単日でも「6/2〜6/4」のような期間でも入力できます。数量と単価を入れると金額が自動計算されます（日割りできない場合は数量・単価を空欄のまま金額欄に直接金額を入力してください）。
+        税率は10・8・0が候補に出ますが、それ以外の数値（例：1、15など）も自由に入力できます。0%にすると、その行は消費税を追加せず金額をそのまま合計に含めます（税込み・対象外として扱われます）。
+      </p>
       <button class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
 
-      <!-- 合計 -->
-      <div class="totals">
-        <div class="total-row">
-          <span class="total-label">小計</span>
-          <span class="total-value" id="subtotal">¥0</span>
-        </div>
-        <div class="total-row">
-          <span class="total-label">消費税（10%）</span>
-          <span class="total-value" id="tax">¥0</span>
-        </div>
-        <div class="total-row grand">
-          <span class="total-label">合計</span>
-          <span class="total-value" id="grandTotal">¥0</span>
-        </div>
-      </div>
+      <!-- 合計（税率ごとに自動生成） -->
+      <div class="totals" id="totalsArea"></div>
     </div>
 
     <!-- アクションボタン -->
@@ -361,6 +363,10 @@ window.addRow = function() {
       <input type="number" placeholder="0" min="0"
         oninput="calcTotals()">
     </td>
+    <td class="col-tax">
+      <input type="number" placeholder="10" min="0" step="0.1" value="10"
+        list="taxRateOptions" oninput="calcTotals()">
+    </td>
     <td class="col-remark">
       <input type="text" placeholder="">
     </td>
@@ -381,7 +387,8 @@ function rowInputs(row) {
     qty: inputs[2],
     price: inputs[3],
     amount: inputs[4],
-    remark: inputs[5],
+    taxRate: inputs[5],
+    remark: inputs[6],
   };
 }
 
@@ -398,21 +405,65 @@ window.calcRow = function(id) {
   calcTotals();
 };
 
-// 合計を計算
-window.calcTotals = function() {
+// 税率ごとに金額をグループ化して集計する
+function buildTaxGroups() {
   const rows = document.querySelectorAll('#itemsBody tr');
-  let subtotal = 0;
+  const groups = new Map(); // rate(number) -> subtotal
   rows.forEach(row => {
     const f = rowInputs(row);
-    subtotal += parseFloat(f.amount.value) || 0;
+    const amount = parseFloat(f.amount.value) || 0;
+    const rate = f.taxRate.value === '' ? 0 : (parseFloat(f.taxRate.value) || 0);
+    groups.set(rate, (groups.get(rate) || 0) + amount);
   });
-  const tax = Math.floor(subtotal * 0.1);
-  const grand = subtotal + tax;
+  // 税率の高い順に並べる（0%は最後）
+  return [...groups.entries()].sort((a, b) => b[0] - a[0]);
+}
 
-  document.getElementById('subtotal').textContent = '¥' + subtotal.toLocaleString();
-  document.getElementById('tax').textContent = '¥' + tax.toLocaleString();
-  document.getElementById('grandTotal').textContent = '¥' + grand.toLocaleString();
+// 合計を計算して表示
+window.calcTotals = function() {
+  const groups = buildTaxGroups();
+  const totalsArea = document.getElementById('totalsArea');
+  if (!totalsArea) return;
+
+  let html = '';
+  let grandTotal = 0;
+
+  groups.forEach(([rate, subtotal]) => {
+    const taxAmount = rate > 0 ? Math.floor(subtotal * (rate / 100)) : 0;
+    grandTotal += subtotal + taxAmount;
+
+    if (rate > 0) {
+      html += `
+        <div class="total-row">
+          <span class="total-label">${formatRate(rate)}%対象小計</span>
+          <span class="total-value">¥${subtotal.toLocaleString()}</span>
+        </div>
+        <div class="total-row">
+          <span class="total-label">消費税（${formatRate(rate)}%）</span>
+          <span class="total-value">¥${taxAmount.toLocaleString()}</span>
+        </div>`;
+    } else {
+      html += `
+        <div class="total-row">
+          <span class="total-label">対象外・税込小計</span>
+          <span class="total-value">¥${subtotal.toLocaleString()}</span>
+        </div>`;
+    }
+  });
+
+  html += `
+    <div class="total-row grand">
+      <span class="total-label">合計</span>
+      <span class="total-value" id="grandTotal">¥${grandTotal.toLocaleString()}</span>
+    </div>`;
+
+  totalsArea.innerHTML = html;
 };
+
+// 税率の表示用フォーマット（不要な小数点を消す）
+function formatRate(rate) {
+  return Number(rate).toString();
+}
 
 // 行を削除
 window.deleteRow = function(id) {
@@ -437,7 +488,7 @@ window.exportExcel = function() {
   const rows = document.querySelectorAll('#itemsBody tr');
   const name = document.getElementById('headerTitle')?.textContent || 'document';
 
-  const data = [['作業日', 'サービス名', '数量', '単価（円）', '金額（円）', '備考']];
+  const data = [['作業日', 'サービス名', '数量', '単価（円）', '金額（円）', '税率（%）', '備考']];
   rows.forEach(row => {
     const f = rowInputs(row);
     data.push([
@@ -446,18 +497,28 @@ window.exportExcel = function() {
       f.qty.value === '' ? '' : parseFloat(f.qty.value) || 0,
       f.price.value === '' ? '' : parseFloat(f.price.value) || 0,
       parseFloat(f.amount.value) || 0,
+      f.taxRate.value === '' ? 0 : parseFloat(f.taxRate.value) || 0,
       f.remark.value,
     ]);
   });
 
-  const toNum = id => parseInt((document.getElementById(id)?.textContent || '0').replace(/[¥,]/g, '')) || 0;
   data.push([]);
-  data.push(['', '', '', '', '小計', '¥' + toNum('subtotal').toLocaleString()]);
-  data.push(['', '', '', '', '消費税（10%）', '¥' + toNum('tax').toLocaleString()]);
-  data.push(['', '', '', '', '合計', '¥' + toNum('grandTotal').toLocaleString()]);
+  const groups = buildTaxGroups();
+  let grandTotal = 0;
+  groups.forEach(([rate, subtotal]) => {
+    const taxAmount = rate > 0 ? Math.floor(subtotal * (rate / 100)) : 0;
+    grandTotal += subtotal + taxAmount;
+    if (rate > 0) {
+      data.push(['', '', '', '', '', `${formatRate(rate)}%対象小計`, '¥' + subtotal.toLocaleString()]);
+      data.push(['', '', '', '', '', `消費税（${formatRate(rate)}%）`, '¥' + taxAmount.toLocaleString()]);
+    } else {
+      data.push(['', '', '', '', '', '対象外・税込小計', '¥' + subtotal.toLocaleString()]);
+    }
+  });
+  data.push(['', '', '', '', '', '合計', '¥' + grandTotal.toLocaleString()]);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 14 }, { wch: 26 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 20 }];
+  ws['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 20 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '明細');
   XLSX.writeFile(wb, `${name}_${todayStr()}.xlsx`);
@@ -483,22 +544,14 @@ window.exportPDF = async function() {
         qty:      f.qty.value === '' ? null : parseFloat(f.qty.value) || 0,
         price:    f.price.value === '' ? null : parseFloat(f.price.value) || 0,
         amount:   parseFloat(f.amount.value) || 0,
+        taxRate:  f.taxRate.value === '' ? 0 : parseFloat(f.taxRate.value) || 0,
         remark:   f.remark.value,
       });
     });
 
     const clientName = document.getElementById('headerTitle')?.textContent?.replace(' 様', '') || '';
 
-    // 合計値を取得（¥と,を除去して数値化）
-    const toNum = id => parseInt((document.getElementById(id)?.textContent || '0').replace(/[¥,]/g, '')) || 0;
-
-    const payload = {
-      clientName,
-      items,
-      subtotal:   toNum('subtotal'),
-      tax:        toNum('tax'),
-      grandTotal: toNum('grandTotal'),
-    };
+    const payload = { clientName, items };
 
     const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
       method: 'POST',
