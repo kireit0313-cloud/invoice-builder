@@ -346,29 +346,29 @@ window.addRow = function() {
   tr.id = id;
   tr.innerHTML = `
     <td class="col-date">
-      <input type="text" placeholder="例：6/2 や 6/2〜6/4">
+      <input type="text" placeholder="例：6/2 や 6/2〜6/4" autocomplete="off">
     </td>
     <td class="col-service">
-      <input type="text" placeholder="例：エアコン洗浄">
+      <input type="text" placeholder="例：エアコン洗浄" autocomplete="off">
     </td>
     <td class="col-qty">
-      <input type="number" placeholder="" min="0"
+      <input type="number" placeholder="" min="0" autocomplete="off"
         oninput="calcRow('${id}')">
     </td>
     <td class="col-price">
-      <input type="number" placeholder="" min="0"
+      <input type="number" placeholder="" min="0" autocomplete="off"
         oninput="calcRow('${id}')">
     </td>
     <td class="col-amount">
-      <input type="number" placeholder="0" min="0"
+      <input type="number" placeholder="0" min="0" autocomplete="off"
         oninput="calcTotals()">
     </td>
     <td class="col-tax">
-      <input type="number" placeholder="10" min="0" step="0.1" value="10"
+      <input type="number" placeholder="10" min="0" step="0.1" value="10" autocomplete="off"
         list="taxRateOptions" oninput="calcTotals()">
     </td>
     <td class="col-remark">
-      <input type="text" placeholder="">
+      <input type="text" placeholder="" autocomplete="off">
     </td>
     <td class="col-delete">
       <button class="delete-btn" onclick="deleteRow('${id}')">×</button>
