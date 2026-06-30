@@ -113,6 +113,27 @@ body {
 .col-remark  { width: 19%; }
 .col-delete  { width: 5%; text-align: center; }
 
+.tax-presets {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+.tax-presets button {
+  flex: 1;
+  padding: 3px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-family: 'Noto Sans JP', sans-serif;
+  cursor: pointer;
+}
+.tax-presets button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .delete-btn {
   background: none;
   border: none;
@@ -234,13 +255,6 @@ body {
   <div class="loading">データを読み込んでいます...</div>
 </div>
 
-<!-- よく使う税率の候補 -->
-<datalist id="taxRateOptions">
-  <option value="10">
-  <option value="8">
-  <option value="0">
-</datalist>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getFirestore, doc, getDoc }
@@ -313,7 +327,7 @@ function buildUI(client) {
       </div>
       <p class="hint">
         作業日は「6/2」のような単日でも「6/2〜6/4」のような期間でも入力できます。数量と単価を入れると金額が自動計算されます（日割りできない場合は数量・単価を空欄のまま金額欄に直接金額を入力してください）。
-        税率は10・8・0が候補に出ますが、それ以外の数値（例：1、15など）も自由に入力できます。0%にすると、その行は消費税を追加せず金額をそのまま合計に含めます（税込み・対象外として扱われます）。
+        税率は10・8・0のボタンを押すだけで入力でき、それ以外の数値（例：1、15など）は欄に直接入力できます。0%にすると、その行は消費税を追加せず金額をそのまま合計に含めます（税込み・対象外として扱われます）。
       </p>
       <button class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
 
@@ -364,8 +378,13 @@ window.addRow = function() {
         oninput="calcTotals()">
     </td>
     <td class="col-tax">
-      <input type="number" placeholder="10" min="0" step="0.1" value="10" autocomplete="off"
-        list="taxRateOptions" oninput="calcTotals()">
+      <input type="number" placeholder="10" min="0" step="0.1" autocomplete="off"
+        id="${id}_tax" oninput="calcTotals()">
+      <div class="tax-presets">
+        <button type="button" onclick="setTaxRate('${id}', 10)">10%</button>
+        <button type="button" onclick="setTaxRate('${id}', 8)">8%</button>
+        <button type="button" onclick="setTaxRate('${id}', 0)">0%</button>
+      </div>
     </td>
     <td class="col-remark">
       <input type="text" placeholder="" autocomplete="off">
@@ -375,6 +394,14 @@ window.addRow = function() {
     </td>
   `;
   document.getElementById('itemsBody').appendChild(tr);
+  document.getElementById(id + '_tax').value = 10;
+  calcTotals();
+};
+
+// 税率プリセットボタンの処理
+window.setTaxRate = function(id, rate) {
+  const input = document.getElementById(id + '_tax');
+  if (input) input.value = rate;
   calcTotals();
 };
 
