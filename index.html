@@ -265,6 +265,46 @@ body {
         placeholder="例：藤田クリーニング様">
     </div>
 
+    <!-- 会社情報・書類設定カード -->
+    <div class="card">
+      <p class="card-title">会社情報・書類設定（PDFに記載する固定情報）</p>
+
+      <label style="font-size:12px;color:var(--ink-soft);">書類タイプ</label>
+      <div style="display:flex;gap:8px;margin:6px 0 14px;">
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+          <input type="radio" name="docType" value="請求書" checked> 請求書
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+          <input type="radio" name="docType" value="見積書"> 見積書
+        </label>
+      </div>
+
+      <label style="font-size:12px;color:var(--ink-soft);">会社名（屋号）</label>
+      <input type="text" id="companyName" class="client-input"
+        placeholder="例：株式会社○○" style="margin-bottom:10px;">
+
+      <label style="font-size:12px;color:var(--ink-soft);">住所</label>
+      <input type="text" id="companyAddress" class="client-input"
+        placeholder="例：東京都〇〇区〇〇1-2-3" style="margin-bottom:10px;">
+
+      <label style="font-size:12px;color:var(--ink-soft);">電話番号</label>
+      <input type="text" id="companyTel" class="client-input"
+        placeholder="例：03-1234-5678" style="margin-bottom:10px;">
+
+      <label style="font-size:12px;color:var(--ink-soft);">インボイス登録番号</label>
+      <input type="text" id="invoiceNumber" class="client-input"
+        placeholder="例：T1234567890123" style="margin-bottom:10px;">
+
+      <label style="font-size:12px;color:var(--ink-soft);">振込先（銀行名・支店名・口座種別・口座番号・名義など）</label>
+      <textarea id="bankInfo" class="client-input" rows="3"
+        placeholder="例：〇〇銀行 〇〇支店 普通 1234567 カ）〇〇"
+        style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
+
+      <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">
+        この情報はクライアントごとに保存され、PDF出力時に自動で差し込まれます。クライアントが変更したり目にすることはありません。
+      </p>
+    </div>
+
     <!-- デフォルト税率設定カード -->
     <div class="card">
       <p class="card-title">デフォルト税率（%）</p>
@@ -462,6 +502,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const defaultTaxRateInput = document.getElementById('defaultTaxRate').value;
   const defaultTaxRate = defaultTaxRateInput === '' ? 10 : (parseInt(defaultTaxRateInput) || 0);
 
+  // 書類タイプ（見積書／請求書）
+  const docTypeInput = document.querySelector('input[name="docType"]:checked');
+  const docType = docTypeInput ? docTypeInput.value : '請求書';
+
+  // 会社情報（固定情報）
+  const companyInfo = {
+    name: document.getElementById('companyName').value.trim(),
+    address: document.getElementById('companyAddress').value.trim(),
+    tel: document.getElementById('companyTel').value.trim(),
+    invoiceNumber: document.getElementById('invoiceNumber').value.trim(),
+    bankInfo: document.getElementById('bankInfo').value.trim(),
+  };
+
   try {
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.textContent = '保存中...';
@@ -473,6 +526,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       clientId: clientId,
       columns: columns,
       defaultTaxRate: defaultTaxRate,
+      docType: docType,
+      companyInfo: companyInfo,
       createdBy: user.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()

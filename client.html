@@ -585,7 +585,12 @@ window.exportPDF = async function() {
 
     const clientName = document.getElementById('headerTitle')?.textContent?.replace(' 様', '') || '';
 
-    const payload = { clientName, items };
+    const payload = {
+      clientName,
+      items,
+      docType: currentClient?.docType || '請求書',
+      companyInfo: currentClient?.companyInfo || null,
+    };
 
     const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
       method: 'POST',
