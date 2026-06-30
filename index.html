@@ -499,6 +499,25 @@ function showColumnsTable(headers) {
   document.getElementById('hintMsg').style.display = 'none';
 }
 
+// 保存済みの列設定（{name, type}の配列）からテーブルを復元する（編集時に使用）
+function showColumnsTableFromSaved(columns) {
+  const tbody = document.getElementById('colsBody');
+  tbody.innerHTML = '';
+
+  columns.forEach(col => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${col.name}</td>
+      <td>${col.type}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('colsCard').style.display = 'block';
+  document.getElementById('saveBtn').style.display = 'block';
+  document.getElementById('hintMsg').style.display = 'none';
+}
+
 // ========== ステップ7：Firestoreに保存 ==========
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
@@ -634,6 +653,9 @@ async function loadClientList() {
           <button class="copy-url-btn" onclick="copyUrl(this, '${url}')">
             URLをコピー
           </button>
+          <button class="copy-url-btn" onclick="editClient('${docSnap.id}')">
+            編集
+          </button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -652,6 +674,56 @@ window.copyUrl = function(btn, url) {
       btn.classList.remove('copied');
     }, 2000);
   });
+};
+
+// ========== 既存クライアントの編集（フォームへの復元） ==========
+
+window.editClient = async function(clientId) {
+  try {
+    const snap = await getDoc(doc(db, 'clients', clientId));
+    if (!snap.exists()) {
+      alert('クライアントデータが見つかりませんでした');
+      return;
+    }
+    const d = snap.data();
+
+    // クライアント名・税率
+    document.getElementById('clientName').value = d.clientName || '';
+    document.getElementById('defaultTaxRate').value =
+      (d.defaultTaxRate !== undefined && d.defaultTaxRate !== null) ? d.defaultTaxRate : 10;
+
+    // 書類タイプ
+    const docType = d.docType === '見積書' ? '見積書' : '請求書';
+    document.querySelectorAll('input[name="docType"]').forEach(r => {
+      r.checked = (r.value === docType);
+    });
+    toggleBankInfoVisibility();
+
+    // 会社情報
+    const company = d.companyInfo || {};
+    document.getElementById('companyName').value = company.name || '';
+    document.getElementById('companyAddress').value = company.address || '';
+    document.getElementById('companyTel').value = company.tel || '';
+    document.getElementById('invoiceNumber').value = company.invoiceNumber || '';
+    document.getElementById('bankInfo').value = company.bankInfo || '';
+
+    // 会社情報に関する追加項目
+    document.getElementById('customFieldsArea').innerHTML = '';
+    (company.customFields || []).forEach(f => addCustomFieldRow(f.label, f.value));
+
+    // 案件情報・送付先情報
+    document.getElementById('projectFieldsArea').innerHTML = '';
+    (d.projectFields || []).forEach(f => addProjectFieldRow(f.label, f.value));
+
+    // 列設定（Excel再アップロード不要で復元）
+    if (d.columns && d.columns.length > 0) {
+      showColumnsTableFromSaved(d.columns);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch(e) {
+    alert('読み込みに失敗しました：' + e.message);
+  }
 };
 
 // ========== その他記載事項（自由追加項目） ==========
