@@ -273,6 +273,11 @@ body {
     <div class="card">
       <p class="card-title">① クライアント名を入力</p>
       <input type="text" id="clientName" class="client-input">
+      <input type="hidden" id="editingClientId" value="">
+      <div id="editingBadge" style="display:none;margin-top:8px;font-size:12px;color:var(--ink-soft);">
+        既存クライアントを編集中です
+        <button type="button" id="newClientBtn" style="margin-left:8px;font-size:12px;padding:2px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">新規登録に戻る</button>
+      </div>
     </div>
 
     <!-- 会社情報・書類設定カード -->
@@ -520,6 +525,11 @@ function showColumnsTableFromSaved(columns) {
 
 // ========== ステップ7：Firestoreに保存 ==========
 
+// 「新規登録に戻る」：編集中の状態を解除し、フォームを新規入力用にリセットする
+document.getElementById('newClientBtn').addEventListener('click', () => {
+  location.reload();
+});
+
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const clientName = document.getElementById('clientName').value.trim();
   if (!clientName) {
@@ -543,11 +553,10 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     });
   });
 
-  // クライアントIDを生成（英数字・日本語のみ、最大30文字）
-  const clientId = clientName
-    .replace(/\s+/g, '_')
-    .replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '')
-    .substring(0, 30);
+  // クライアントID：編集中の既存クライアントならそのIDを維持、
+  // 新規クライアントならランダムなIDを新しく発行する（会社名の使い回し・推測対策）
+  const editingIdField = document.getElementById('editingClientId');
+  const clientId = editingIdField.value || crypto.randomUUID();
 
   // デフォルト税率（未入力の場合は10%）
   const defaultTaxRateInput = document.getElementById('defaultTaxRate').value;
@@ -613,6 +622,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       createdAt: createdAt,
       updatedAt: serverTimestamp()
     });
+
+    editingIdField.value = clientId;
+    document.getElementById('editingBadge').style.display = 'block';
 
     alert(`保存しました！\nクライアント名：${clientName}\nID：${clientId}`);
     loadClientList();
@@ -686,6 +698,10 @@ window.editClient = async function(clientId) {
       return;
     }
     const d = snap.data();
+
+    // 編集中のクライアントIDを保持（保存時にIDを維持するため）
+    document.getElementById('editingClientId').value = clientId;
+    document.getElementById('editingBadge').style.display = 'block';
 
     // クライアント名・税率
     document.getElementById('clientName').value = d.clientName || '';
