@@ -479,17 +479,20 @@ function renderPartnerList() {
         ${partners.length === 0
           ? `<p style="color:var(--ink-soft);font-size:13px;padding:8px 0;">取引先がまだ登録されていません。下の欄から追加してください。</p>`
           : partners.map(p => `
-            <div class="partner-item" id="pitem_${p.id}" onclick="openPartner('${p.id}')">
+            <div class="partner-item" id="pitem_${p.id}"
+              data-pid="${escHtml(p.id)}" onclick="openPartnerById(this)">
               <input type="checkbox" class="partner-checkbox" id="chk_${p.id}"
-                onclick="event.stopPropagation(); toggleCheck('${p.id}')"
+                data-pid="${escHtml(p.id)}"
+                onclick="event.stopPropagation(); toggleCheckById(this)"
                 ${isChecked(p.id) ? 'checked' : ''}>
               <div class="partner-info">
-                <div class="partner-name">${p.partnerName || '（名前なし）'}</div>
+                <div class="partner-name">${escHtml(p.partnerName || '（名前なし）')}</div>
                 <div class="partner-meta">${p.updatedAt ? '最終更新：' + formatDate(p.updatedAt.toDate()) : '未入力'}</div>
               </div>
               <span class="partner-arrow">›</span>
               <button class="partner-delete-btn" title="削除"
-                onclick="event.stopPropagation(); deletePartner('${p.id}', '${(p.partnerName||'').replace(/'/g,'\\'')}')">×</button>
+                data-pid="${escHtml(p.id)}"
+                onclick="event.stopPropagation(); deletePartnerById(this)">&times;</button>
             </div>
           `).join('')
         }
@@ -513,7 +516,11 @@ function renderPartnerList() {
 // チェック状態管理
 const checkedIds = new Set();
 function isChecked(id) { return checkedIds.has(id); }
-window.toggleCheck = function(id) {
+
+// data属性からIDを取得してチェック切り替え
+window.toggleCheckById = function(el) {
+  const id = el.dataset.pid;
+  if (!id) return;
   if (checkedIds.has(id)) checkedIds.delete(id);
   else checkedIds.add(id);
   const item = document.getElementById('pitem_' + id);
@@ -533,13 +540,32 @@ function updateBulkBar() {
   }
 }
 
-// 取引先を開く
-window.openPartner = async function(partnerId) {
-  const partner = partners.find(p => p.id === partnerId);
+// data属性からIDを取得して取引先を開く
+window.openPartnerById = function(el) {
+  const id = el.dataset.pid;
+  if (!id) return;
+  const partner = partners.find(p => p.id === id);
   if (!partner) return;
   currentPartner = partner;
-  currentPartnerId = partnerId;
+  currentPartnerId = id;
   showDetailScreen(partner, partner.lineItems && partner.lineItems.length > 0);
+};
+
+// data属性からIDを取得して削除
+window.deletePartnerById = async function(el) {
+  const id = el.dataset.pid;
+  if (!id) return;
+  const partner = partners.find(p => p.id === id);
+  const name = partner ? (partner.partnerName || '') : '';
+  if (!confirm(`「${name}」を削除しますか？\nこの取引先のデータはすべて削除されます。`)) return;
+  try {
+    await deleteDoc(doc(db, 'clients', clientId, 'partners', id));
+    checkedIds.delete(id);
+    partners = partners.filter(p => p.id !== id);
+    renderPartnerList();
+  } catch(e) {
+    alert('削除に失敗しました：' + e.message);
+  }
 };
 
 // 取引先追加
@@ -557,24 +583,14 @@ window.addPartner = async function() {
     });
     // 一覧を更新して即座に開く
     await showPartnerList();
-    openPartner(ref.id);
+    const newPartner = partners.find(p => p.id === ref.id);
+    if (newPartner) { currentPartner = newPartner; currentPartnerId = ref.id; showDetailScreen(newPartner, false); }
   } catch(e) {
     alert('追加に失敗しました：' + e.message);
   }
 };
 
-// 取引先削除
-window.deletePartner = async function(partnerId, name) {
-  if (!confirm(`「${name}」を削除しますか？\nこの取引先のデータはすべて削除されます。`)) return;
-  try {
-    await deleteDoc(doc(db, 'clients', clientId, 'partners', partnerId));
-    checkedIds.delete(partnerId);
-    partners = partners.filter(p => p.id !== partnerId);
-    renderPartnerList();
-  } catch(e) {
-    alert('削除に失敗しました：' + e.message);
-  }
-};
+
 
 // =====================
 //  明細入力画面
