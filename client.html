@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>見積書・請求書入力</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -16,6 +18,7 @@
   --accent: #3B82F6;
   --danger: #EF4444;
   --success: #10B981;
+  --warning: #F59E0B;
 }
 body {
   background: var(--bg);
@@ -31,17 +34,23 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
 }
-.header-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--ink);
-}
-.header-sub {
-  font-size: 12px;
+.header-left { display: flex; align-items: center; gap: 1rem; }
+.back-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
   color: var(--ink-soft);
-  margin-top: 2px;
+  cursor: pointer;
+  display: none;
 }
+.back-btn:hover { border-color: var(--accent); color: var(--accent); }
+.header-title { font-size: 16px; font-weight: 500; color: var(--ink); }
+.header-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 .body {
   padding: 2rem 1.5rem;
   max-width: 1080px;
@@ -64,11 +73,95 @@ body {
   margin-bottom: 1rem;
 }
 
-/* 明細テーブル */
-.table-scroll {
-  width: 100%;
-  overflow-x: auto;
+/* ===== 取引先一覧 ===== */
+.partner-list { display: flex; flex-direction: column; gap: 8px; }
+.partner-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
+.partner-item:hover { border-color: var(--accent); }
+.partner-item.checked { border-color: var(--accent); background: #EFF6FF; }
+.partner-checkbox { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+.partner-info { flex: 1; }
+.partner-name { font-size: 14px; font-weight: 500; color: var(--ink); }
+.partner-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.partner-arrow { color: var(--ink-soft); font-size: 16px; }
+.partner-delete-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.partner-delete-btn:hover { color: var(--danger); }
+
+.add-partner-area {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.add-partner-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.add-partner-input:focus { border-color: var(--accent); }
+.add-partner-btn {
+  padding: 10px 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  cursor: pointer;
+}
+.add-partner-btn:hover { opacity: 0.85; }
+
+/* 一括操作バー */
+.bulk-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.bulk-bar.visible { display: flex; }
+.bulk-bar-label { flex: 1; }
+.bulk-pdf-btn {
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  cursor: pointer;
+}
+.bulk-pdf-btn:hover { opacity: 0.85; }
+.bulk-pdf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== 明細テーブル ===== */
+.table-scroll { width: 100%; overflow-x: auto; }
 .items-table {
   width: 100%;
   min-width: 860px;
@@ -98,12 +191,8 @@ body {
   color: var(--ink);
   outline: none;
 }
-.items-table input:focus {
-  border-color: var(--accent);
-}
-.items-table input[type="number"] {
-  text-align: right;
-}
+.items-table input:focus { border-color: var(--accent); }
+.items-table input[type="number"] { text-align: right; }
 .col-date    { width: 12%; }
 .col-service { width: 21%; }
 .col-qty     { width: 7%; }
@@ -112,12 +201,7 @@ body {
 .col-tax     { width: 9%; }
 .col-remark  { width: 19%; }
 .col-delete  { width: 5%; text-align: center; }
-
-.tax-presets {
-  display: flex;
-  gap: 3px;
-  margin-top: 4px;
-}
+.tax-presets { display: flex; gap: 3px; margin-top: 4px; }
 .tax-presets button {
   flex: 1;
   padding: 3px 0;
@@ -129,11 +213,7 @@ body {
   font-family: 'Noto Sans JP', sans-serif;
   cursor: pointer;
 }
-.tax-presets button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
+.tax-presets button:hover { border-color: var(--accent); color: var(--accent); }
 .delete-btn {
   background: none;
   border: none;
@@ -144,7 +224,6 @@ body {
   border-radius: 4px;
 }
 .delete-btn:hover { color: var(--danger); }
-
 .add-row-btn {
   margin-top: 1rem;
   padding: 8px 16px;
@@ -157,10 +236,7 @@ body {
   font-family: 'Noto Sans JP', sans-serif;
   width: 100%;
 }
-.add-row-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
+.add-row-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* 合計エリア */
 .totals {
@@ -172,12 +248,7 @@ body {
   padding-top: 1rem;
   border-top: 2px solid var(--border);
 }
-.total-row {
-  display: flex;
-  gap: 2rem;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
+.total-row { display: flex; gap: 2rem; font-size: 13px; color: var(--ink-soft); }
 .total-row.grand {
   font-size: 16px;
   font-weight: 500;
@@ -190,11 +261,7 @@ body {
 .total-value { min-width: 100px; text-align: right; }
 
 /* アクションボタン */
-.actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
+.actions { display: flex; gap: 1rem; justify-content: flex-end; }
 .btn {
   padding: 12px 28px;
   border: none;
@@ -204,24 +271,94 @@ body {
   font-family: 'Noto Sans JP', sans-serif;
   font-weight: 500;
 }
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-}
-.btn-secondary {
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--border);
-}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
 .btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 自由記入欄 */
+.free-fields { display: flex; flex-direction: column; gap: 10px; }
+.free-field-row { display: flex; gap: 8px; align-items: center; }
+.free-field-label {
+  width: 140px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.free-field-value {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.free-field-label:focus, .free-field-value:focus { border-color: var(--accent); }
+.free-field-del {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+.free-field-del:hover { color: var(--danger); }
+.add-field-btn {
+  padding: 7px 14px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  width: 100%;
+  margin-top: 4px;
+}
+.add-field-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 会社情報編集 */
+.company-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.company-edit-grid label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+.company-edit-grid input, .company-edit-grid textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+.company-edit-grid input:focus, .company-edit-grid textarea:focus { border-color: var(--accent); }
+.company-edit-grid input[readonly] { background: var(--bg); color: var(--ink-soft); cursor: not-allowed; }
+.company-edit-full { grid-column: 1 / -1; }
+.company-save-btn {
+  margin-top: 12px;
+  padding: 9px 20px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Noto Sans JP', sans-serif;
+  cursor: pointer;
+}
+.company-save-btn:hover { opacity: 0.85; }
 
 /* ローディング・エラー */
-.loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--ink-soft);
-  font-size: 14px;
-}
+.loading { text-align: center; padding: 3rem; color: var(--ink-soft); font-size: 14px; }
 .error-box {
   background: #FEF2F2;
   border: 1px solid #FECACA;
@@ -231,23 +368,27 @@ body {
   color: var(--danger);
   font-size: 14px;
 }
-
-/* 補足テキスト */
-.hint {
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-top: 0.5rem;
+.hint { font-size: 12px; color: var(--ink-soft); margin-top: 0.5rem; }
+.badge-imported {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #D1FAE5;
+  color: #065F46;
+  border-radius: 20px;
+  margin-left: 8px;
 }
 </style>
-<!-- Excel出力用ライブラリ -->
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
 <div class="header">
-  <div>
-    <div class="header-title" id="headerTitle">読み込み中...</div>
-    <div class="header-sub" id="headerSub">見積書・請求書入力</div>
+  <div class="header-left">
+    <button class="back-btn" id="backBtn" onclick="showPartnerList()">← 取引先一覧</button>
+    <div>
+      <div class="header-title" id="headerTitle">読み込み中...</div>
+      <div class="header-sub" id="headerSub">請求書・見積書入力</div>
+    </div>
   </div>
 </div>
 
@@ -257,8 +398,10 @@ body {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { getFirestore, doc, getDoc }
-  from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import {
+  getFirestore, doc, getDoc, setDoc, addDoc,
+  collection, getDocs, deleteDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyATf8RjZ7y_wjiiPJ1VR9KXktbDPXuMpFo",
@@ -270,49 +413,193 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db  = getFirestore(app);
+const PDF_SERVER = 'https://invoice-pdf-server-682338340449.asia-northeast1.run.app';
 
-// URLのパラメータからクライアントIDを取得
-const params = new URLSearchParams(window.location.search);
+const params   = new URLSearchParams(window.location.search);
 const clientId = params.get('id');
 
-// メイン処理
-async function init() {
-  if (!clientId) {
-    showError('クライアントIDが指定されていません。');
-    return;
-  }
+let currentClient  = null;  // クライアント設定（Firestore: clients/{clientId}）
+let currentPartner = null;  // 現在選択中の取引先
+let currentPartnerId = null;
+let partners       = [];    // 取引先一覧キャッシュ
+let rowCount       = 0;
 
+// =====================
+//  初期化
+// =====================
+async function init() {
+  if (!clientId) { showError('クライアントIDが指定されていません。'); return; }
   try {
     const snap = await getDoc(doc(db, 'clients', clientId));
-    if (!snap.exists()) {
-      showError(`クライアント「${clientId}」が見つかりません。`);
-      return;
-    }
-
-    const client = snap.data();
-    buildUI(client);
+    if (!snap.exists()) { showError('クライアント情報が見つかりません。'); return; }
+    currentClient = snap.data();
+    document.getElementById('headerTitle').textContent = currentClient.clientName + ' 様';
+    document.title = currentClient.clientName + ' 様';
+    await showPartnerList();
   } catch(e) {
     showError('データの読み込みに失敗しました：' + e.message);
   }
 }
 
-// 読み込んだクライアント設定（デフォルト税率などに使用）
-let currentClient = null;
+// =====================
+//  取引先一覧画面
+// =====================
+window.showPartnerList = async function() {
+  currentPartner = null;
+  currentPartnerId = null;
+  document.getElementById('backBtn').style.display = 'none';
+  const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
+  document.getElementById('headerSub').textContent = docLabel + '入力';
 
-// UI構築
-function buildUI(client) {
-  currentClient = client;
-  document.getElementById('headerTitle').textContent = client.clientName + ' 様';
-  const docTypeLabel = client.docType === '見積書' ? '見積書' : '請求書';
-  document.getElementById('headerSub').textContent = docTypeLabel + '入力';
-  document.title = client.clientName + ' 様 | ' + docTypeLabel + '入力';
+  // Firestoreから取引先一覧を取得
+  const snap = await getDocs(collection(db, 'clients', clientId, 'partners'));
+  partners = [];
+  snap.forEach(d => partners.push({ id: d.id, ...d.data() }));
+  partners.sort((a, b) => (a.partnerName || '').localeCompare(b.partnerName || '', 'ja'));
 
+  renderPartnerList();
+};
+
+function renderPartnerList() {
+  const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
   const body = document.getElementById('mainBody');
   body.innerHTML = `
-    <!-- 明細入力カード -->
+    <!-- 取引先一覧 -->
     <div class="card">
-      <p class="card-title">明細を入力</p>
+      <p class="card-title">取引先を選んでください</p>
+
+      <!-- 一括操作バー -->
+      <div class="bulk-bar" id="bulkBar">
+        <span class="bulk-bar-label" id="bulkLabel">0件選択中</span>
+        <button class="bulk-pdf-btn" id="bulkPdfBtn" onclick="bulkExportPDF()">選択した取引先をまとめてPDF出力（ZIP）</button>
+      </div>
+
+      <div class="partner-list" id="partnerList">
+        ${partners.length === 0
+          ? `<p style="color:var(--ink-soft);font-size:13px;padding:8px 0;">取引先がまだ登録されていません。下の欄から追加してください。</p>`
+          : partners.map(p => `
+            <div class="partner-item" id="pitem_${p.id}" onclick="openPartner('${p.id}')">
+              <input type="checkbox" class="partner-checkbox" id="chk_${p.id}"
+                onclick="event.stopPropagation(); toggleCheck('${p.id}')"
+                ${isChecked(p.id) ? 'checked' : ''}>
+              <div class="partner-info">
+                <div class="partner-name">${p.partnerName || '（名前なし）'}</div>
+                <div class="partner-meta">${p.updatedAt ? '最終更新：' + formatDate(p.updatedAt.toDate()) : '未入力'}</div>
+              </div>
+              <span class="partner-arrow">›</span>
+              <button class="partner-delete-btn" title="削除"
+                onclick="event.stopPropagation(); deletePartner('${p.id}', '${(p.partnerName||'').replace(/'/g,'\\'')}')">×</button>
+            </div>
+          `).join('')
+        }
+      </div>
+
+      <!-- 取引先追加 -->
+      <div class="add-partner-area" style="margin-top:1rem;">
+        <input type="text" class="add-partner-input" id="newPartnerName" placeholder="取引先名を入力">
+        <button class="add-partner-btn" onclick="addPartner()">追加</button>
+      </div>
+    </div>
+
+    <!-- 会社情報編集 -->
+    <div class="card">
+      <p class="card-title">会社情報の編集</p>
+      ${buildCompanyEditHTML()}
+    </div>
+  `;
+}
+
+// チェック状態管理
+const checkedIds = new Set();
+function isChecked(id) { return checkedIds.has(id); }
+window.toggleCheck = function(id) {
+  if (checkedIds.has(id)) checkedIds.delete(id);
+  else checkedIds.add(id);
+  const item = document.getElementById('pitem_' + id);
+  if (item) item.classList.toggle('checked', checkedIds.has(id));
+  updateBulkBar();
+};
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  const label = document.getElementById('bulkLabel');
+  if (!bar) return;
+  const cnt = checkedIds.size;
+  if (cnt > 0) {
+    bar.classList.add('visible');
+    label.textContent = cnt + '件選択中';
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+// 取引先を開く
+window.openPartner = async function(partnerId) {
+  const partner = partners.find(p => p.id === partnerId);
+  if (!partner) return;
+  currentPartner = partner;
+  currentPartnerId = partnerId;
+  showDetailScreen(partner, partner.lineItems && partner.lineItems.length > 0);
+};
+
+// 取引先追加
+window.addPartner = async function() {
+  const nameInput = document.getElementById('newPartnerName');
+  const name = nameInput.value.trim();
+  if (!name) { alert('取引先名を入力してください。'); return; }
+  try {
+    const ref = await addDoc(collection(db, 'clients', clientId, 'partners'), {
+      partnerName: name,
+      lineItems: [],
+      freeFields: currentClient.projectFields || [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    // 一覧を更新して即座に開く
+    await showPartnerList();
+    openPartner(ref.id);
+  } catch(e) {
+    alert('追加に失敗しました：' + e.message);
+  }
+};
+
+// 取引先削除
+window.deletePartner = async function(partnerId, name) {
+  if (!confirm(`「${name}」を削除しますか？\nこの取引先のデータはすべて削除されます。`)) return;
+  try {
+    await deleteDoc(doc(db, 'clients', clientId, 'partners', partnerId));
+    checkedIds.delete(partnerId);
+    partners = partners.filter(p => p.id !== partnerId);
+    renderPartnerList();
+  } catch(e) {
+    alert('削除に失敗しました：' + e.message);
+  }
+};
+
+// =====================
+//  明細入力画面
+// =====================
+function showDetailScreen(partner, imported) {
+  document.getElementById('backBtn').style.display = 'inline-block';
+  const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
+  document.getElementById('headerSub').textContent = partner.partnerName + ' ｜ ' + docLabel + '入力';
+
+  rowCount = 0;
+  const body = document.getElementById('mainBody');
+  body.innerHTML = `
+    <!-- 自由記入欄 -->
+    <div class="card">
+      <p class="card-title">自由記入欄（任意）</p>
+      <div class="free-fields" id="freeFieldsArea"></div>
+      <button class="add-field-btn" onclick="addFreeField('','')">＋ 項目を追加</button>
+    </div>
+
+    <!-- 明細入力 -->
+    <div class="card">
+      <p class="card-title">
+        明細を入力
+        ${imported ? '<span class="badge-imported">先月データをインポート済み</span>' : ''}
+      </p>
       <div class="table-scroll">
         <table class="items-table">
           <thead>
@@ -327,64 +614,102 @@ function buildUI(client) {
               <th class="col-delete"></th>
             </tr>
           </thead>
-          <tbody id="itemsBody">
-          </tbody>
+          <tbody id="itemsBody"></tbody>
         </table>
       </div>
       <p class="hint">
-        作業日は「6/2」のような単日でも「6/2〜6/4」のような期間でも入力できます。数量と単価を入れると金額が自動計算されます（日割りできない場合は数量・単価を空欄のまま金額欄に直接金額を入力してください）。
-        税率は10・8・0のボタンを押すだけで入力でき、それ以外の数値（例：1、15など）は欄に直接入力できます。0%にすると、その行は消費税を追加せず金額をそのまま合計に含めます（税込み・対象外として扱われます）。
+        作業日は「6/2」や「6/2〜6/4」など自由に入力できます。数量と単価を入れると金額が自動計算されます。税率は10・8・0ボタンで即入力、それ以外は直接入力できます。
       </p>
       <button class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
-
-      <!-- 合計（税率ごとに自動生成） -->
       <div class="totals" id="totalsArea"></div>
     </div>
 
-    <!-- アクションボタン -->
+    <!-- アクション -->
     <div class="actions">
       <button class="btn btn-secondary" onclick="exportExcel()">Excelで保存</button>
-      <button class="btn btn-primary" onclick="exportPDF()">PDF出力</button>
+      <button class="btn btn-primary" id="pdfBtn" onclick="exportPDF()">PDF出力・保存</button>
     </div>
   `;
 
-  // 最初の1行を追加
-  addRow();
+  // 自由記入欄の初期描画
+  const freeFields = partner.freeFields || [];
+  if (freeFields.length > 0) {
+    freeFields.forEach(f => addFreeField(f.label, f.value));
+  }
+
+  // 明細の初期描画（先月データがあればインポート、なければ空行1行）
+  if (partner.lineItems && partner.lineItems.length > 0) {
+    partner.lineItems.forEach(item => addRow(item));
+  } else {
+    addRow();
+  }
 }
 
-// 今日の日付をyyyy-mm-dd形式で返す
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
+// =====================
+//  自由記入欄
+// =====================
+window.addFreeField = function(label, value) {
+  const area = document.getElementById('freeFieldsArea');
+  if (!area) return;
+  const id = 'ff_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const div = document.createElement('div');
+  div.className = 'free-field-row';
+  div.id = id;
+  div.innerHTML = `
+    <input type="text" class="free-field-label" placeholder="項目名（例：施工場所）" value="${escHtml(label)}" autocomplete="off">
+    <input type="text" class="free-field-value" placeholder="内容" value="${escHtml(value)}" autocomplete="off">
+    <button class="free-field-del" onclick="document.getElementById('${id}').remove()">×</button>
+  `;
+  area.appendChild(div);
+};
+
+function getFreeFields() {
+  const rows = document.querySelectorAll('#freeFieldsArea .free-field-row');
+  return [...rows].map(row => {
+    const inputs = row.querySelectorAll('input');
+    return { label: inputs[0].value, value: inputs[1].value };
+  }).filter(f => f.label || f.value);
 }
 
-// 行を追加
-let rowCount = 0;
-window.addRow = function() {
+// =====================
+//  明細行
+// =====================
+window.addRow = function(item) {
   rowCount++;
   const id = 'row_' + rowCount;
   const tr = document.createElement('tr');
   tr.id = id;
+  const defaultRate = (currentClient && currentClient.defaultTaxRate !== undefined)
+    ? currentClient.defaultTaxRate : 10;
+  const taxVal  = item ? item.taxRate  : defaultRate;
+  const dateVal = item ? (item.workDate || '') : '';
+  const svcVal  = item ? (item.service  || '') : '';
+  const qtyVal  = (item && item.qty !== null && item.qty !== undefined) ? item.qty : '';
+  const priceVal= (item && item.price !== null && item.price !== undefined) ? item.price : '';
+  const amtVal  = item ? (item.amount  || 0) : '';
+  const remVal  = item ? (item.remark  || '') : '';
+
   tr.innerHTML = `
     <td class="col-date">
-      <input type="text" placeholder="例：6/2 や 6/2〜6/4" autocomplete="off">
+      <input type="text" value="${escHtml(String(dateVal))}" placeholder="例：6/2 や 6/2〜6/4" autocomplete="off">
     </td>
     <td class="col-service">
-      <input type="text" placeholder="例：エアコン洗浄" autocomplete="off">
+      <input type="text" value="${escHtml(String(svcVal))}" placeholder="例：エアコン洗浄" autocomplete="off">
     </td>
     <td class="col-qty">
-      <input type="number" placeholder="" min="0" autocomplete="off"
+      <input type="number" value="${qtyVal}" placeholder="" min="0" autocomplete="off"
         oninput="calcRow('${id}')">
     </td>
     <td class="col-price">
-      <input type="number" placeholder="" min="0" autocomplete="off"
+      <input type="number" value="${priceVal}" placeholder="" min="0" autocomplete="off"
         oninput="calcRow('${id}')">
     </td>
     <td class="col-amount">
-      <input type="number" placeholder="0" min="0" autocomplete="off"
+      <input type="number" value="${amtVal}" placeholder="0" min="0" autocomplete="off"
         oninput="calcTotals()">
     </td>
     <td class="col-tax">
-      <input type="number" placeholder="10" min="0" step="1" autocomplete="off"
+      <input type="number" value="${taxVal}" placeholder="10" min="0" step="1" autocomplete="off"
         id="${id}_tax" oninput="calcTotals()">
       <div class="tax-presets">
         <button type="button" onclick="setTaxRate('${id}', 10)">10%</button>
@@ -393,236 +718,336 @@ window.addRow = function() {
       </div>
     </td>
     <td class="col-remark">
-      <input type="text" placeholder="" autocomplete="off">
+      <input type="text" value="${escHtml(String(remVal))}" placeholder="" autocomplete="off">
     </td>
     <td class="col-delete">
       <button class="delete-btn" onclick="deleteRow('${id}')">×</button>
     </td>
   `;
   document.getElementById('itemsBody').appendChild(tr);
-  const defaultRate = (currentClient && currentClient.defaultTaxRate !== undefined && currentClient.defaultTaxRate !== null)
-    ? currentClient.defaultTaxRate
-    : 10;
-  document.getElementById(id + '_tax').value = defaultRate;
   calcTotals();
 };
 
-// 税率プリセットボタンの処理
 window.setTaxRate = function(id, rate) {
   const input = document.getElementById(id + '_tax');
-  if (input) input.value = rate;
-  calcTotals();
+  if (input) { input.value = rate; calcTotals(); }
 };
-
-// 行の入力欄を名前で取得
-function rowInputs(row) {
-  const inputs = row.querySelectorAll('input');
-  return {
-    date: inputs[0],
-    service: inputs[1],
-    qty: inputs[2],
-    price: inputs[3],
-    amount: inputs[4],
-    taxRate: inputs[5],
-    remark: inputs[6],
-  };
-}
-
-// 数量・単価が両方入力されていれば金額を自動計算
 window.calcRow = function(id) {
   const row = document.getElementById(id);
   if (!row) return;
   const f = rowInputs(row);
   if (f.qty.value !== '' && f.price.value !== '') {
-    const qty = parseFloat(f.qty.value) || 0;
-    const price = parseFloat(f.price.value) || 0;
-    f.amount.value = qty * price;
+    f.amount.value = (parseFloat(f.qty.value)||0) * (parseFloat(f.price.value)||0);
   }
   calcTotals();
 };
+window.deleteRow = function(id) {
+  const row = document.getElementById(id);
+  if (row) { row.remove(); calcTotals(); }
+};
 
-// 税率ごとに金額をグループ化して集計する
+function rowInputs(row) {
+  const inputs = row.querySelectorAll('input');
+  return { date: inputs[0], service: inputs[1], qty: inputs[2],
+           price: inputs[3], amount: inputs[4], taxRate: inputs[5], remark: inputs[6] };
+}
+function getLineItems() {
+  return [...document.querySelectorAll('#itemsBody tr')].map(row => {
+    const f = rowInputs(row);
+    return {
+      workDate: f.date.value,
+      service:  f.service.value,
+      qty:      f.qty.value === '' ? null : parseFloat(f.qty.value) || 0,
+      price:    f.price.value === '' ? null : parseFloat(f.price.value) || 0,
+      amount:   parseFloat(f.amount.value) || 0,
+      taxRate:  f.taxRate.value === '' ? 0 : parseInt(f.taxRate.value) || 0,
+      remark:   f.remark.value,
+    };
+  });
+}
+
+// =====================
+//  合計計算
+// =====================
 function buildTaxGroups() {
   const rows = document.querySelectorAll('#itemsBody tr');
-  const groups = new Map(); // rate(number) -> subtotal
+  const groups = new Map();
   rows.forEach(row => {
     const f = rowInputs(row);
     const amount = parseFloat(f.amount.value) || 0;
-    const rate = f.taxRate.value === '' ? 0 : (parseInt(f.taxRate.value) || 0);
+    const rate   = f.taxRate.value === '' ? 0 : (parseInt(f.taxRate.value) || 0);
     groups.set(rate, (groups.get(rate) || 0) + amount);
   });
-  // 税率の高い順に並べる（0%は最後）
   return [...groups.entries()].sort((a, b) => b[0] - a[0]);
 }
-
-// 合計を計算して表示
 window.calcTotals = function() {
   const groups = buildTaxGroups();
-  const totalsArea = document.getElementById('totalsArea');
-  if (!totalsArea) return;
-
-  let html = '';
-  let grandTotal = 0;
-
+  const area   = document.getElementById('totalsArea');
+  if (!area) return;
+  let html = '', grandTotal = 0;
   groups.forEach(([rate, subtotal]) => {
-    const taxAmount = rate > 0 ? Math.floor(subtotal * (rate / 100)) : 0;
-    grandTotal += subtotal + taxAmount;
-
+    const tax = rate > 0 ? Math.floor(subtotal * (rate / 100)) : 0;
+    grandTotal += subtotal + tax;
     if (rate > 0) {
-      html += `
-        <div class="total-row">
-          <span class="total-label">${formatRate(rate)}%対象小計</span>
-          <span class="total-value">¥${subtotal.toLocaleString()}</span>
-        </div>
-        <div class="total-row">
-          <span class="total-label">消費税（${formatRate(rate)}%）</span>
-          <span class="total-value">¥${taxAmount.toLocaleString()}</span>
-        </div>`;
+      html += `<div class="total-row"><span class="total-label">${rate}%対象小計</span><span class="total-value">¥${subtotal.toLocaleString()}</span></div>
+               <div class="total-row"><span class="total-label">消費税（${rate}%）</span><span class="total-value">¥${tax.toLocaleString()}</span></div>`;
     } else {
-      html += `
-        <div class="total-row">
-          <span class="total-label">対象外・税込小計</span>
-          <span class="total-value">¥${subtotal.toLocaleString()}</span>
-        </div>`;
+      html += `<div class="total-row"><span class="total-label">対象外・税込小計</span><span class="total-value">¥${subtotal.toLocaleString()}</span></div>`;
     }
   });
-
-  html += `
-    <div class="total-row grand">
-      <span class="total-label">合計</span>
-      <span class="total-value" id="grandTotal">¥${grandTotal.toLocaleString()}</span>
-    </div>`;
-
-  totalsArea.innerHTML = html;
+  html += `<div class="total-row grand"><span class="total-label">合計</span><span class="total-value">¥${grandTotal.toLocaleString()}</span></div>`;
+  area.innerHTML = html;
 };
 
-// 税率の表示用フォーマット（不要な小数点を消す）
-function formatRate(rate) {
-  return Number(rate).toString();
-}
+// =====================
+//  PDF出力・Firestoreへ保存
+// =====================
+window.exportPDF = async function() {
+  const btn = document.getElementById('pdfBtn');
+  btn.textContent = 'PDF生成中...';
+  btn.disabled = true;
+  try {
+    const items      = getLineItems();
+    const freeFields = getFreeFields();
+    const blob = await generatePDF(currentPartner.partnerName, items, freeFields);
 
-// 行を削除
-window.deleteRow = function(id) {
-  const row = document.getElementById(id);
-  if (row) {
-    row.remove();
-    calcTotals();
+    // ダウンロード
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href    = url;
+    a.download = `${currentPartner.partnerName}_${todayStr()}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Firestoreへ保存（次月の「先月データ」になる）
+    await setDoc(doc(db, 'clients', clientId, 'partners', currentPartnerId), {
+      partnerName: currentPartner.partnerName,
+      lineItems:   items,
+      freeFields:  freeFields,
+      updatedAt:   serverTimestamp(),
+    }, { merge: true });
+
+    currentPartner.lineItems  = items;
+    currentPartner.freeFields = freeFields;
+
+  } catch(e) {
+    alert('PDF生成に失敗しました：' + e.message);
+  } finally {
+    btn.textContent = 'PDF出力・保存';
+    btn.disabled = false;
   }
 };
 
-// エラー表示
-function showError(msg) {
-  document.getElementById('headerTitle').textContent = 'エラー';
-  document.getElementById('mainBody').innerHTML =
-    `<div class="error-box">${msg}</div>`;
+// PDF生成（Cloud Run）
+async function generatePDF(partnerName, items, freeFields) {
+  const payload = {
+    clientName:   partnerName,
+    items,
+    docType:      currentClient?.docType || '請求書',
+    companyInfo:  currentClient?.companyInfo || null,
+    projectFields: freeFields,
+  };
+  const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'サーバーエラー');
+  }
+  return await res.blob();
 }
 
-init();
+// =====================
+//  一括PDF出力（ZIP）
+// =====================
+window.bulkExportPDF = async function() {
+  const targets = partners.filter(p => checkedIds.has(p.id));
+  if (targets.length === 0) { alert('取引先を選択してください。'); return; }
 
-// Excel出力
+  const btn = document.getElementById('bulkPdfBtn');
+  btn.disabled = true;
+  btn.textContent = 'PDF生成中...';
+
+  try {
+    const zip  = new JSZip();
+    const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
+    const today = todayStr();
+
+    for (let i = 0; i < targets.length; i++) {
+      const p = targets[i];
+      btn.textContent = `PDF生成中... (${i+1}/${targets.length})`;
+      const items      = p.lineItems  || [];
+      const freeFields = p.freeFields || [];
+      try {
+        const blob = await generatePDF(p.partnerName, items, freeFields);
+        const buf  = await blob.arrayBuffer();
+        zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
+      } catch(e) {
+        console.warn(`${p.partnerName} のPDF生成失敗:`, e.message);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a   = document.createElement('a');
+    a.href    = url;
+    a.download = `${docLabel}_一括出力_${today}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch(e) {
+    alert('一括PDF出力に失敗しました：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '選択した取引先をまとめてPDF出力（ZIP）';
+  }
+};
+
+// =====================
+//  会社情報編集
+// =====================
+function buildCompanyEditHTML() {
+  const c = currentClient?.companyInfo || {};
+  const customFields = (c.customFields || []).map((f, i) => `
+    <div class="free-field-row" id="cff_${i}">
+      <input type="text" class="free-field-label" value="${escHtml(f.label||'')}" placeholder="項目名" autocomplete="off">
+      <input type="text" class="free-field-value" value="${escHtml(f.value||'')}" placeholder="内容" autocomplete="off">
+      <button class="free-field-del" onclick="document.getElementById('cff_${i}').remove()">×</button>
+    </div>
+  `).join('');
+
+  return `
+    <div class="company-edit-grid">
+      <div>
+        <label>社名（変更不可）</label>
+        <input type="text" value="${escHtml(c.name||'')}" readonly>
+      </div>
+      <div>
+        <label>TEL</label>
+        <input type="text" id="cTel" value="${escHtml(c.tel||'')}" autocomplete="off">
+      </div>
+      <div class="company-edit-full">
+        <label>住所</label>
+        <input type="text" id="cAddress" value="${escHtml(c.address||'')}" autocomplete="off">
+      </div>
+      <div>
+        <label>インボイス登録番号</label>
+        <input type="text" id="cInvoiceNumber" value="${escHtml(c.invoiceNumber||'')}" autocomplete="off">
+      </div>
+      <div>
+        <label>振込先</label>
+        <input type="text" id="cBankInfo" value="${escHtml(c.bankInfo||'')}" autocomplete="off">
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:12px;margin-bottom:8px;">追加項目</p>
+    <div class="free-fields" id="companyCustomFields">${customFields}</div>
+    <button class="add-field-btn" onclick="addCompanyCustomField()">＋ 追加項目を追加</button>
+    <br>
+    <button class="company-save-btn" onclick="saveCompanyInfo()">会社情報を保存</button>
+  `;
+}
+
+window.addCompanyCustomField = function() {
+  const area = document.getElementById('companyCustomFields');
+  if (!area) return;
+  const idx = area.children.length;
+  const div = document.createElement('div');
+  div.className = 'free-field-row';
+  div.id = 'cff_new_' + idx;
+  div.innerHTML = `
+    <input type="text" class="free-field-label" placeholder="項目名" autocomplete="off">
+    <input type="text" class="free-field-value" placeholder="内容" autocomplete="off">
+    <button class="free-field-del" onclick="this.parentElement.remove()">×</button>
+  `;
+  area.appendChild(div);
+};
+
+window.saveCompanyInfo = async function() {
+  const c = currentClient?.companyInfo || {};
+  const customRows = document.querySelectorAll('#companyCustomFields .free-field-row');
+  const customFields = [...customRows].map(row => {
+    const inputs = row.querySelectorAll('input');
+    return { label: inputs[0].value, value: inputs[1].value };
+  }).filter(f => f.label || f.value);
+
+  const updated = {
+    ...c,
+    tel:           document.getElementById('cTel')?.value || '',
+    address:       document.getElementById('cAddress')?.value || '',
+    invoiceNumber: document.getElementById('cInvoiceNumber')?.value || '',
+    bankInfo:      document.getElementById('cBankInfo')?.value || '',
+    customFields,
+  };
+
+  try {
+    await setDoc(doc(db, 'clients', clientId), {
+      companyInfo: updated,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    currentClient.companyInfo = updated;
+    alert('会社情報を保存しました。');
+  } catch(e) {
+    alert('保存に失敗しました：' + e.message);
+  }
+};
+
+// =====================
+//  Excel出力
+// =====================
 window.exportExcel = function() {
+  const name = currentPartner?.partnerName || 'document';
+  const data = [['作業日','サービス名','数量','単価（円）','金額（円）','税率（%）','備考']];
   const rows = document.querySelectorAll('#itemsBody tr');
-  const name = document.getElementById('headerTitle')?.textContent || 'document';
-
-  const data = [['作業日', 'サービス名', '数量', '単価（円）', '金額（円）', '税率（%）', '備考']];
   rows.forEach(row => {
     const f = rowInputs(row);
     data.push([
-      f.date.value,
-      f.service.value,
-      f.qty.value === '' ? '' : parseFloat(f.qty.value) || 0,
-      f.price.value === '' ? '' : parseFloat(f.price.value) || 0,
-      parseFloat(f.amount.value) || 0,
-      f.taxRate.value === '' ? 0 : parseInt(f.taxRate.value) || 0,
+      f.date.value, f.service.value,
+      f.qty.value==='' ? '' : parseFloat(f.qty.value)||0,
+      f.price.value==='' ? '' : parseFloat(f.price.value)||0,
+      parseFloat(f.amount.value)||0,
+      f.taxRate.value==='' ? 0 : parseInt(f.taxRate.value)||0,
       f.remark.value,
     ]);
   });
-
   data.push([]);
   const groups = buildTaxGroups();
   let grandTotal = 0;
   groups.forEach(([rate, subtotal]) => {
-    const taxAmount = rate > 0 ? Math.floor(subtotal * (rate / 100)) : 0;
-    grandTotal += subtotal + taxAmount;
+    const tax = rate > 0 ? Math.floor(subtotal*(rate/100)) : 0;
+    grandTotal += subtotal + tax;
     if (rate > 0) {
-      data.push(['', '', '', '', '', `${formatRate(rate)}%対象小計`, '¥' + subtotal.toLocaleString()]);
-      data.push(['', '', '', '', '', `消費税（${formatRate(rate)}%）`, '¥' + taxAmount.toLocaleString()]);
+      data.push(['','','','','', `${rate}%対象小計`, '¥'+subtotal.toLocaleString()]);
+      data.push(['','','','','', `消費税（${rate}%）`, '¥'+tax.toLocaleString()]);
     } else {
-      data.push(['', '', '', '', '', '対象外・税込小計', '¥' + subtotal.toLocaleString()]);
+      data.push(['','','','','', '対象外・税込小計', '¥'+subtotal.toLocaleString()]);
     }
   });
-  data.push(['', '', '', '', '', '合計', '¥' + grandTotal.toLocaleString()]);
-
+  data.push(['','','','','','合計','¥'+grandTotal.toLocaleString()]);
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 20 }];
+  ws['!cols'] = [{wch:14},{wch:24},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '明細');
   XLSX.writeFile(wb, `${name}_${todayStr()}.xlsx`);
 };
 
-// PDF出力（Cloud Run + Puppeteer）
-const PDF_SERVER = 'https://invoice-pdf-server-682338340449.asia-northeast1.run.app';
+// =====================
+//  ユーティリティ
+// =====================
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function formatDate(d) {
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function showError(msg) {
+  document.getElementById('headerTitle').textContent = 'エラー';
+  document.getElementById('mainBody').innerHTML = `<div class="error-box">${msg}</div>`;
+}
 
-window.exportPDF = async function() {
-  const btn = document.querySelector('.btn-primary');
-  btn.textContent = 'PDF生成中...';
-  btn.disabled = true;
-
-  try {
-    // 明細データを収集
-    const rows = document.querySelectorAll('#itemsBody tr');
-    const items = [];
-    rows.forEach(row => {
-      const f = rowInputs(row);
-      items.push({
-        workDate: f.date.value,
-        service:  f.service.value,
-        qty:      f.qty.value === '' ? null : parseFloat(f.qty.value) || 0,
-        price:    f.price.value === '' ? null : parseFloat(f.price.value) || 0,
-        amount:   parseFloat(f.amount.value) || 0,
-        taxRate:  f.taxRate.value === '' ? 0 : parseInt(f.taxRate.value) || 0,
-        remark:   f.remark.value,
-      });
-    });
-
-    const clientName = document.getElementById('headerTitle')?.textContent?.replace(' 様', '') || '';
-
-    const payload = {
-      clientName,
-      items,
-      docType: currentClient?.docType || '請求書',
-      companyInfo: currentClient?.companyInfo || null,
-      projectFields: currentClient?.projectFields || [],
-    };
-
-    const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'サーバーエラー');
-    }
-
-    // PDFをダウンロード
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${clientName}_${todayStr()}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-  } catch(e) {
-    alert('PDF生成に失敗しました：' + e.message);
-  } finally {
-    btn.textContent = 'PDF出力';
-    btn.disabled = false;
-  }
-};
+init();
 </script>
-
 </body>
 </html>
