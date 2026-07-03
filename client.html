@@ -925,51 +925,6 @@ async function generatePDF(partnerName, items, freeFields) {
   return await res.blob();
 }
 
-// =====================
-//  一括PDF出力（ZIP）
-// =====================
-window.bulkExportPDF = async function() {
-  const targets = partners.filter(p => checkedIds.has(p.id));
-  if (targets.length === 0) { alert('取引先を選択してください。'); return; }
-
-  const btn = document.getElementById('bulkPdfBtn');
-  btn.disabled = true;
-  btn.textContent = 'PDF生成中...';
-
-  try {
-    const zip  = new JSZip();
-    const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
-    const today = todayStr();
-
-    for (let i = 0; i < targets.length; i++) {
-      const p = targets[i];
-      btn.textContent = `PDF生成中... (${i+1}/${targets.length})`;
-      const items      = p.lineItems  || [];
-      const freeFields = p.freeFields || [];
-      try {
-        const blob = await generatePDF(p.partnerName, items, freeFields);
-        const buf  = await blob.arrayBuffer();
-        zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
-      } catch(e) {
-        console.warn(`${p.partnerName} のPDF生成失敗:`, e.message);
-      }
-    }
-
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(zipBlob);
-    const a   = document.createElement('a');
-    a.href    = url;
-    a.download = `${docLabel}_一括出力_${today}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-  } catch(e) {
-    alert('一括PDF出力に失敗しました：' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '選択した取引先をまとめてPDF出力（ZIP）';
-  }
-};
   // =====================
 //  一括編集モード
 // =====================
