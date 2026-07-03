@@ -378,6 +378,56 @@ body {
   border-radius: 20px;
   margin-left: 8px;
 }
+  /* ===== 一括編集モード ===== */
+.bulk-edit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+.bulk-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.bulk-edit-header:hover { background: #EFF6FF; }
+.bulk-edit-header-left { display: flex; align-items: center; gap: 10px; }
+.bulk-edit-partner-name { font-size: 14px; font-weight: 500; color: var(--ink); }
+.bulk-edit-toggle { font-size: 12px; color: var(--ink-soft); }
+.bulk-edit-body { padding: 1rem 1.5rem 1.5rem; }
+.bulk-edit-body.collapsed { display: none; }
+.bulk-actions-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  z-index: 10;
+}
+.bulk-progress { font-size: 13px; color: var(--ink-soft); }
+.bulk-export-btn {
+  padding: 12px 28px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+}
+.bulk-export-btn:hover { opacity: 0.85; }
+.bulk-export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -472,7 +522,8 @@ function renderPartnerList() {
       <!-- 一括操作バー -->
       <div class="bulk-bar" id="bulkBar">
         <span class="bulk-bar-label" id="bulkLabel">0件選択中</span>
-        <button class="bulk-pdf-btn" id="bulkPdfBtn" onclick="bulkExportPDF()">選択した取引先をまとめてPDF出力（ZIP）</button>
+        <button class="bulk-pdf-btn" id="bulkEditBtn" onclick="openBulkEditMode()">一括編集モードで開く</button>
+        <button class="bulk-pdf-btn" id="bulkPdfBtn" onclick="bulkExportPDF()">そのままZIP出力</button>
       </div>
 
       <div class="partner-list" id="partnerList">
@@ -918,6 +969,243 @@ window.bulkExportPDF = async function() {
   } finally {
     btn.disabled = false;
     btn.textContent = '選択した取引先をまとめてPDF出力（ZIP）';
+  }
+};
+  // =====================
+//  一括編集モード
+// =====================
+window.openBulkEditMode = function() {
+  const targets = partners.filter(p => checkedIds.has(p.id));
+  if (targets.length === 0) { alert('取引先を選択してください。'); return; }
+
+  document.getElementById('backBtn').style.display = 'inline-block';
+  document.getElementById('headerSub').textContent = '一括編集モード（' + targets.length + '件）';
+
+  const body = document.getElementById('mainBody');
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:1rem;" id="bulkEditCards"></div>
+    <div class="bulk-actions-bar">
+      <span class="bulk-progress" id="bulkEditProgress">${targets.length}件のPDFをまとめて出力します</span>
+      <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">全PDF出力（ZIP）</button>
+    </div>
+  `;
+
+  const container = document.getElementById('bulkEditCards');
+  targets.forEach((p, idx) => {
+    const cardId = 'becard_' + p.id;
+    const bodyId = 'bebdy_' + p.id;
+    const tableId = 'betbl_' + p.id;
+    const totalsId = 'betot_' + p.id;
+
+    const card = document.createElement('div');
+    card.className = 'bulk-edit-card';
+    card.id = cardId;
+    card.innerHTML = `
+      <div class="bulk-edit-header" onclick="toggleBulkCard('${bodyId}', this)">
+        <div class="bulk-edit-header-left">
+          <span class="bulk-edit-partner-name">${escHtml(p.partnerName || '（名前なし）')}</span>
+          <span style="font-size:12px;color:var(--ink-soft);">${(p.lineItems||[]).length}行</span>
+        </div>
+        <span class="bulk-edit-toggle">▲ 折りたたむ</span>
+      </div>
+      <div class="bulk-edit-body" id="${bodyId}">
+        <div class="table-scroll">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th class="col-date">作業日</th>
+                <th class="col-service">サービス名</th>
+                <th class="col-qty">数量</th>
+                <th class="col-price">単価（円）</th>
+                <th class="col-amount">金額（円）</th>
+                <th class="col-tax">税率（%）</th>
+                <th class="col-remark">備考</th>
+                <th class="col-delete"></th>
+              </tr>
+            </thead>
+            <tbody id="${tableId}"></tbody>
+          </table>
+        </div>
+        <button class="add-row-btn" onclick="bulkAddRow('${tableId}')">＋ 行を追加</button>
+        <div class="totals" id="${totalsId}"></div>
+      </div>
+    `;
+    container.appendChild(card);
+
+    // 明細行の描画
+    const items = (p.lineItems && p.lineItems.length > 0) ? p.lineItems : [null];
+    items.forEach(item => bulkAddRow(tableId, item));
+    bulkCalcTotals(tableId, totalsId);
+  });
+
+  // targetsをグローバルに保持
+  window._bulkEditTargets = targets;
+};
+
+window.toggleBulkCard = function(bodyId, headerEl) {
+  const body = document.getElementById(bodyId);
+  const toggle = headerEl.querySelector('.bulk-edit-toggle');
+  if (body.classList.contains('collapsed')) {
+    body.classList.remove('collapsed');
+    toggle.textContent = '▲ 折りたたむ';
+  } else {
+    body.classList.add('collapsed');
+    toggle.textContent = '▼ 開く';
+  }
+};
+
+window.bulkAddRow = function(tableId, item) {
+  const tbody = document.getElementById(tableId);
+  if (!tbody) return;
+  const rid = tableId + '_r' + tbody.rows.length;
+  const defaultRate = (currentClient && currentClient.defaultTaxRate !== undefined)
+    ? currentClient.defaultTaxRate : 10;
+  const taxVal   = item ? item.taxRate  : defaultRate;
+  const dateVal  = item ? (item.workDate || '') : '';
+  const svcVal   = item ? (item.service  || '') : '';
+  const qtyVal   = (item && item.qty !== null && item.qty !== undefined) ? item.qty : '';
+  const priceVal = (item && item.price !== null && item.price !== undefined) ? item.price : '';
+  const amtVal   = item ? (item.amount  || 0) : '';
+  const remVal   = item ? (item.remark  || '') : '';
+
+  const totalsId = tableId.replace('betbl_', 'betot_');
+  const tr = document.createElement('tr');
+  tr.id = rid;
+  tr.innerHTML = `
+    <td class="col-date"><input type="text" value="${escHtml(String(dateVal))}" placeholder="例：6/2" autocomplete="off"></td>
+    <td class="col-service"><input type="text" value="${escHtml(String(svcVal))}" placeholder="サービス名" autocomplete="off"></td>
+    <td class="col-qty"><input type="number" value="${qtyVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
+    <td class="col-price"><input type="number" value="${priceVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
+    <td class="col-amount"><input type="number" value="${amtVal}" placeholder="0" min="0" autocomplete="off" oninput="bulkCalcTotals('${tableId}','${totalsId}')"></td>
+    <td class="col-tax">
+      <input type="number" value="${taxVal}" min="0" step="1" autocomplete="off" id="${rid}_tax" oninput="bulkCalcTotals('${tableId}','${totalsId}')">
+      <div class="tax-presets">
+        <button type="button" onclick="bulkSetTax('${rid}','${tableId}','${totalsId}',10)">10%</button>
+        <button type="button" onclick="bulkSetTax('${rid}','${tableId}','${totalsId}',8)">8%</button>
+        <button type="button" onclick="bulkSetTax('${rid}','${tableId}','${totalsId}',0)">0%</button>
+      </div>
+    </td>
+    <td class="col-remark"><input type="text" value="${escHtml(String(remVal))}" autocomplete="off"></td>
+    <td class="col-delete"><button class="delete-btn" onclick="bulkDeleteRow('${rid}','${tableId}','${totalsId}')">×</button></td>
+  `;
+  tbody.appendChild(tr);
+};
+
+window.bulkSetTax = function(rid, tableId, totalsId, rate) {
+  const input = document.getElementById(rid + '_tax');
+  if (input) { input.value = rate; bulkCalcTotals(tableId, totalsId); }
+};
+window.bulkCalcRow = function(rid, tableId, totalsId) {
+  const row = document.getElementById(rid);
+  if (!row) return;
+  const inputs = row.querySelectorAll('input');
+  const qty = inputs[2], price = inputs[3], amount = inputs[4];
+  if (qty.value !== '' && price.value !== '') {
+    amount.value = (parseFloat(qty.value)||0) * (parseFloat(price.value)||0);
+  }
+  bulkCalcTotals(tableId, totalsId);
+};
+window.bulkDeleteRow = function(rid, tableId, totalsId) {
+  const row = document.getElementById(rid);
+  if (row) { row.remove(); bulkCalcTotals(tableId, totalsId); }
+};
+window.bulkCalcTotals = function(tableId, totalsId) {
+  const tbody = document.getElementById(tableId);
+  const area  = document.getElementById(totalsId);
+  if (!tbody || !area) return;
+  const groups = new Map();
+  [...tbody.rows].forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const amount = parseFloat(inputs[4]?.value) || 0;
+    const rate   = inputs[5]?.value === '' ? 0 : (parseInt(inputs[5]?.value) || 0);
+    groups.set(rate, (groups.get(rate) || 0) + amount);
+  });
+  let html = '', grandTotal = 0;
+  [...groups.entries()].sort((a,b) => b[0]-a[0]).forEach(([rate, subtotal]) => {
+    const tax = rate > 0 ? Math.floor(subtotal * (rate/100)) : 0;
+    grandTotal += subtotal + tax;
+    if (rate > 0) {
+      html += `<div class="total-row"><span class="total-label">${rate}%対象小計</span><span class="total-value">¥${subtotal.toLocaleString()}</span></div>
+               <div class="total-row"><span class="total-label">消費税（${rate}%）</span><span class="total-value">¥${tax.toLocaleString()}</span></div>`;
+    } else {
+      html += `<div class="total-row"><span class="total-label">対象外・税込小計</span><span class="total-value">¥${subtotal.toLocaleString()}</span></div>`;
+    }
+  });
+  html += `<div class="total-row grand"><span class="total-label">合計</span><span class="total-value">¥${grandTotal.toLocaleString()}</span></div>`;
+  area.innerHTML = html;
+};
+
+function bulkGetLineItems(tableId) {
+  const tbody = document.getElementById(tableId);
+  if (!tbody) return [];
+  return [...tbody.rows].map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      workDate: inputs[0].value,
+      service:  inputs[1].value,
+      qty:      inputs[2].value === '' ? null : parseFloat(inputs[2].value) || 0,
+      price:    inputs[3].value === '' ? null : parseFloat(inputs[3].value) || 0,
+      amount:   parseFloat(inputs[4].value) || 0,
+      taxRate:  inputs[5].value === '' ? 0 : parseInt(inputs[5].value) || 0,
+      remark:   inputs[6].value,
+    };
+  });
+}
+
+window.bulkEditExport = async function() {
+  const targets = window._bulkEditTargets || [];
+  if (targets.length === 0) return;
+
+  const btn = document.getElementById('bulkEditExportBtn');
+  const progress = document.getElementById('bulkEditProgress');
+  btn.disabled = true;
+
+  try {
+    const zip = new JSZip();
+    const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
+    const today = todayStr();
+
+    for (let i = 0; i < targets.length; i++) {
+      const p = targets[i];
+      const tableId = 'betbl_' + p.id;
+      progress.textContent = `PDF生成中... (${i+1}/${targets.length}) ${p.partnerName}`;
+
+      const items = bulkGetLineItems(tableId);
+      const freeFields = p.freeFields || [];
+
+      try {
+        const blob = await generatePDF(p.partnerName, items, freeFields);
+        const buf  = await blob.arrayBuffer();
+        zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
+
+        // Firestoreへ保存（先月データ更新）
+        await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
+          partnerName: p.partnerName,
+          lineItems:   items,
+          freeFields:  freeFields,
+          updatedAt:   serverTimestamp(),
+        }, { merge: true });
+
+      } catch(e) {
+        console.warn(`${p.partnerName} のPDF生成失敗:`, e.message);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a   = document.createElement('a');
+    a.href    = url;
+    a.download = `${docLabel}_一括出力_${today}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    progress.textContent = '完了！';
+    setTimeout(() => showPartnerList(), 1500);
+
+  } catch(e) {
+    alert('一括PDF出力に失敗しました：' + e.message);
+  } finally {
+    btn.disabled = false;
   }
 };
 
