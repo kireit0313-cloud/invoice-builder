@@ -940,7 +940,7 @@ window.openBulkEditMode = function() {
     <div style="display:flex;flex-direction:column;gap:1rem;" id="bulkEditCards"></div>
     <div class="bulk-actions-bar">
       <span class="bulk-progress" id="bulkEditProgress">${targets.length}件のPDFをまとめて出力します</span>
-      <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">全PDF出力（ZIP）</button>
+      <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">一括出力（PDF＋Excel）ZIP</button>
     </div>
   `;
 
@@ -1132,6 +1132,44 @@ window.bulkEditExport = async function() {
         const buf  = await blob.arrayBuffer();
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
+        // Excel生成してZIPに追加
+        const xlsData = [['作業日','サービス名','数量','単価（円）','金額（円）','税率（%）','備考']];
+        items.forEach(it => {
+          xlsData.push([
+            it.date, it.service,
+            it.qty   == null ? '' : it.qty,
+            it.price == null ? '' : it.price,
+            it.amount,
+            it.taxRate,
+            it.remark,
+          ]);
+        });
+        xlsData.push([]);
+        // 税率ごと合計
+        const taxMap = {};
+        items.forEach(it => {
+          const r = it.taxRate || 0;
+          taxMap[r] = (taxMap[r] || 0) + (it.amount || 0);
+        });
+        let grandTotal = 0;
+        Object.entries(taxMap).sort((a,b)=>b[0]-a[0]).forEach(([rate, subtotal]) => {
+          const r = parseInt(rate);
+          const tax = r > 0 ? Math.floor(subtotal*(r/100)) : 0;
+          grandTotal += subtotal + tax;
+          if (r > 0) {
+            xlsData.push(['','','','','', `${r}%対象小計`, '¥'+subtotal.toLocaleString()]);
+            xlsData.push(['','','','','', `消費税（${r}%）`, '¥'+tax.toLocaleString()]);
+          } else {
+            xlsData.push(['','','','','', '対象外・税込小計', '¥'+subtotal.toLocaleString()]);
+          }
+        });
+        xlsData.push(['','','','','','合計','¥'+grandTotal.toLocaleString()]);
+        const ws = XLSX.utils.aoa_to_sheet(xlsData);
+        ws['!cols'] = [{wch:14},{wch:24},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '明細');
+        const xlsBuf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        zip.file(`${docLabel}_${p.partnerName}_${today}.xlsx`, xlsBuf);
         // Firestoreへ保存（先月データ更新）
         await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
           partnerName: p.partnerName,
