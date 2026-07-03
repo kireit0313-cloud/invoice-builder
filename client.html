@@ -1113,6 +1113,7 @@ window.bulkEditExport = async function() {
   const btn = document.getElementById('bulkEditExportBtn');
   const progress = document.getElementById('bulkEditProgress');
   btn.disabled = true;
+  btn.textContent = '出力中...';
 
   try {
     const zip = new JSZip();
@@ -1198,6 +1199,7 @@ window.bulkEditExport = async function() {
     alert('一括PDF出力に失敗しました：' + e.message);
   } finally {
     btn.disabled = false;
+    btn.textContent = '一括出力（PDF＋Excel）ZIP';
   }
 };
 
