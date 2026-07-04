@@ -715,9 +715,9 @@ function showDetailScreen(partner, imported) {
 
     <!-- アクション -->
     <div class="actions">
-      <button class="btn btn-secondary" onclick="exportExcel()">Excelで保存</button>
       <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容保存</button>
-      <button class="btn btn-primary" id="pdfBtn" onclick="exportPDF()">PDF出力・保存</button>
+      <button class="btn" id="excelBtn" onclick="exportExcel()" style="background:#1D6F42;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">Excel出力</button>
+      <button class="btn" id="pdfBtn" onclick="exportPDF()" style="background:#D32F2F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">PDF出力</button>
     </div>
   `;
 
@@ -734,9 +734,9 @@ function showDetailScreen(partner, imported) {
     addRow();
   }
 
-  // 発行日の初期表示
+  // 発行日の初期表示（保存済みissueDateがあればそれを優先）
   const issueDay = partner.issueDay || '末日';
-  const computed = calcIssueDate(issueDay);
+  const computed = partner.issueDate || calcIssueDate(issueDay);
   document.getElementById('issueDateDisplay').textContent = computed;
   document.getElementById('issueDayLabel').textContent = `（締め日：${issueDay === '手入力' ? '手入力' : issueDay + '日'}）`;
   if (issueDay === '手入力') {
@@ -908,10 +908,8 @@ window.savePartnerData = async function() {
     const items      = getLineItems();
     const freeFields = getFreeFields();
     const issueDate  = getIssueDate();
-    const issueDay   = currentPartner.issueDay || '末日';
     await setDoc(doc(db, 'clients', clientId, 'partners', currentPartnerId), {
       partnerName: currentPartner.partnerName,
-      issueDay:    issueDay,
       issueDate:   issueDate,
       lineItems:   items,
       freeFields:  freeFields,
