@@ -1030,7 +1030,7 @@ window.openBulkEditMode = function() {
       <div class="bulk-edit-body" id="${bodyId}">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0 4px;">
           <span style="font-size:13px;color:var(--ink-soft);">発行日：</span>
-          <span style="font-size:14px;font-weight:bold;">${calcIssueDate(p.issueDay || '末日')}</span>
+          <span style="font-size:14px;font-weight:bold;">${p.issueDate || calcIssueDate(p.issueDay || '末日')}</span>
           <span style="font-size:12px;color:var(--ink-soft);">（締め日：${p.issueDay && p.issueDay !== '手入力' ? p.issueDay + '日' : p.issueDay || '末日'}）</span>
         </div>
         <div class="table-scroll">
