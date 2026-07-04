@@ -663,6 +663,19 @@ function showDetailScreen(partner, imported) {
   rowCount = 0;
   const body = document.getElementById('mainBody');
   body.innerHTML = `
+    <!-- 発行日 -->
+    <div class="card">
+      <p class="card-title">発行日</p>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="issueDateDisplay" style="font-size:15px;font-weight:bold;"></span>
+        <span id="issueDayLabel" style="font-size:13px;color:var(--ink-soft);"></span>
+        <button class="add-field-btn" onclick="toggleIssueDateEdit()" style="margin:0;">変更</button>
+        <input type="text" id="issueDateCustom" placeholder="例：2026年7月31日"
+          style="display:none;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:200px;"
+          oninput="updateIssueDateDisplay()">
+      </div>
+    </div>
+
     <!-- 自由記入欄 -->
     <div class="card">
       <p class="card-title">自由記入欄（任意）</p>
@@ -718,6 +731,16 @@ function showDetailScreen(partner, imported) {
     partner.lineItems.forEach(item => addRow(item));
   } else {
     addRow();
+  }
+
+  // 発行日の初期表示
+  const issueDay = partner.issueDay || '末日';
+  const computed = calcIssueDate(issueDay);
+  document.getElementById('issueDateDisplay').textContent = computed;
+  document.getElementById('issueDayLabel').textContent = `（締め日：${issueDay === '手入力' ? '手入力' : issueDay + '日'}）`;
+  if (issueDay === '手入力') {
+    document.getElementById('issueDateCustom').style.display = 'inline-block';
+    document.getElementById('issueDateCustom').value = computed;
   }
 }
 
@@ -885,7 +908,8 @@ window.exportPDF = async function() {
   try {
     const items      = getLineItems();
     const freeFields = getFreeFields();
-    const blob = await generatePDF(currentPartner.partnerName, items, freeFields);
+    const issueDate  = getIssueDate();
+    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate);
 
     // ダウンロード
     const url = URL.createObjectURL(blob);
@@ -915,13 +939,14 @@ window.exportPDF = async function() {
 };
 
 // PDF生成（Cloud Run）
-async function generatePDF(partnerName, items, freeFields) {
+async function generatePDF(partnerName, items, freeFields, issueDate) {
   const payload = {
     clientName:   partnerName,
     items,
     docType:      currentClient?.docType || '請求書',
     companyInfo:  currentClient?.companyInfo || null,
     projectFields: freeFields,
+    issueDate:    issueDate || calcIssueDate('末日'),
   };
   const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
     method: 'POST',
@@ -1359,6 +1384,30 @@ function calcIssueDate(issueDay) {
   // 手入力 or 不明な場合は今日の日付を返す
   const d = now.getDate();
   return `${y}年${m + 1}月${d}日`;
+}
+  // 発行日の「変更」ボタン
+window.toggleIssueDateEdit = function() {
+  const input = document.getElementById('issueDateCustom');
+  if (input.style.display === 'none') {
+    input.style.display = 'inline-block';
+    if (!input.value) input.value = document.getElementById('issueDateDisplay').textContent;
+  } else {
+    input.style.display = 'none';
+    if (input.value.trim()) {
+      document.getElementById('issueDateDisplay').textContent = input.value.trim();
+    }
+  }
+};
+
+// 手入力欄の変更をリアルタイム反映
+window.updateIssueDateDisplay = function() {
+  const val = document.getElementById('issueDateCustom').value.trim();
+  if (val) document.getElementById('issueDateDisplay').textContent = val;
+};
+
+// 現在の発行日を取得（PDF生成時に使用）
+function getIssueDate() {
+  return document.getElementById('issueDateDisplay')?.textContent || calcIssueDate('末日');
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
