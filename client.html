@@ -716,6 +716,7 @@ function showDetailScreen(partner, imported) {
     <!-- アクション -->
     <div class="actions">
       <button class="btn btn-secondary" onclick="exportExcel()">Excelで保存</button>
+      <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容保存</button>
       <button class="btn btn-primary" id="pdfBtn" onclick="exportPDF()">PDF出力・保存</button>
     </div>
   `;
@@ -898,6 +899,36 @@ window.calcTotals = function() {
   area.innerHTML = html;
 };
 
+// 内容保存（発行日・自由記入欄・明細をFirestoreに保存）
+window.savePartnerData = async function() {
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = '保存中...';
+  btn.disabled = true;
+  try {
+    const items      = getLineItems();
+    const freeFields = getFreeFields();
+    const issueDate  = getIssueDate();
+    const issueDay   = currentPartner.issueDay || '末日';
+    await setDoc(doc(db, 'clients', clientId, 'partners', currentPartnerId), {
+      partnerName: currentPartner.partnerName,
+      issueDay:    issueDay,
+      issueDate:   issueDate,
+      lineItems:   items,
+      freeFields:  freeFields,
+      updatedAt:   serverTimestamp(),
+    }, { merge: true });
+    currentPartner.lineItems  = items;
+    currentPartner.freeFields = freeFields;
+    currentPartner.issueDate  = issueDate;
+    btn.textContent = '保存しました ✓';
+    setTimeout(() => { btn.textContent = '内容保存'; btn.disabled = false; }, 2000);
+  } catch(e) {
+    alert('保存に失敗しました：' + e.message);
+    btn.textContent = '内容保存';
+    btn.disabled = false;
+  }
+};
+  
 // =====================
 //  PDF出力・Firestoreへ保存
 // =====================
@@ -975,6 +1006,7 @@ window.openBulkEditMode = function() {
     <div style="display:flex;flex-direction:column;gap:1rem;" id="bulkEditCards"></div>
     <div class="bulk-actions-bar">
       <span class="bulk-progress" id="bulkEditProgress">${targets.length}件のPDFをまとめて出力します</span>
+      <button class="btn btn-secondary" id="bulkSaveBtn" onclick="bulkSaveAll()" style="padding:10px 20px;">全件内容保存</button>
       <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">一括出力（PDF＋Excel）ZIP</button>
     </div>
   `;
@@ -1000,12 +1032,8 @@ window.openBulkEditMode = function() {
       <div class="bulk-edit-body" id="${bodyId}">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0 4px;">
           <span style="font-size:13px;color:var(--ink-soft);">発行日：</span>
-          <span id="bid_${p.id}" style="font-size:14px;font-weight:bold;">${calcIssueDate(p.issueDay || '末日')}</span>
+          <span style="font-size:14px;font-weight:bold;">${calcIssueDate(p.issueDay || '末日')}</span>
           <span style="font-size:12px;color:var(--ink-soft);">（締め日：${p.issueDay && p.issueDay !== '手入力' ? p.issueDay + '日' : p.issueDay || '末日'}）</span>
-          <input type="text" id="bidinput_${p.id}" placeholder="例：2026年7月31日"
-            style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:180px;"
-            value="${calcIssueDate(p.issueDay || '末日')}"
-            oninput="document.getElementById('bid_${p.id}').textContent=this.value">
         </div>
         <div class="table-scroll">
           <table class="items-table">
@@ -1150,6 +1178,36 @@ function bulkGetLineItems(tableId) {
   });
 }
 
+// 一括編集モード：全件内容保存
+window.bulkSaveAll = async function() {
+  const targets = window._bulkEditTargets || [];
+  if (targets.length === 0) return;
+  const btn = document.getElementById('bulkSaveBtn');
+  btn.textContent = '保存中...';
+  btn.disabled = true;
+  try {
+    for (const p of targets) {
+      const tableId = 'betbl_' + p.id;
+      const items = bulkGetLineItems(tableId);
+      const issueDate = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
+        partnerName: p.partnerName,
+        issueDay:    p.issueDay || '末日',
+        issueDate:   issueDate,
+        lineItems:   items,
+        freeFields:  p.freeFields || [],
+        updatedAt:   serverTimestamp(),
+      }, { merge: true });
+    }
+    btn.textContent = '保存しました ✓';
+    setTimeout(() => { btn.textContent = '全件内容保存'; btn.disabled = false; }, 2000);
+  } catch(e) {
+    alert('保存に失敗しました：' + e.message);
+    btn.textContent = '全件内容保存';
+    btn.disabled = false;
+  }
+};
+
 window.bulkEditExport = async function() {
   const targets = window._bulkEditTargets || [];
   if (targets.length === 0) return;
@@ -1171,7 +1229,7 @@ window.bulkEditExport = async function() {
 
       const items = bulkGetLineItems(tableId);
       const freeFields = p.freeFields || [];
-      const issueDateBulk = document.getElementById('bidinput_' + p.id)?.value || calcIssueDate(p.issueDay || '末日');
+      const issueDateBulk = p.issueDate || calcIssueDate(p.issueDay || '末日');
 
       try {
         const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk);
