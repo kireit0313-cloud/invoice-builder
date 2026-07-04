@@ -551,6 +551,10 @@ function renderPartnerList() {
       <!-- 取引先追加 -->
       <div class="add-partner-area" style="margin-top:1rem;">
         <input type="text" class="add-partner-input" id="newPartnerName" placeholder="取引先名を入力">
+        <select id="newPartnerHonorific" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
+          <option value="御中">御中（法人）</option>
+          <option value="様">様（個人）</option>
+        </select>
         <select id="newPartnerIssueDay" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
           <option value="末日">締め日：末日</option>
           <option value="25">締め日：25日</option>
@@ -630,11 +634,13 @@ window.deletePartnerById = async function(el) {
 window.addPartner = async function() {
   const nameInput = document.getElementById('newPartnerName');
   const name = nameInput.value.trim();
+  const honorific = document.getElementById('newPartnerHonorific').value;
   const issueDay = document.getElementById('newPartnerIssueDay').value;
   if (!name) { alert('取引先名を入力してください。'); return; }
   try {
     const ref = await addDoc(collection(db, 'clients', clientId, 'partners'), {
       partnerName: name,
+      honorific: honorific,
       issueDay: issueDay,
       lineItems: [],
       freeFields: currentClient.projectFields || [],
@@ -976,6 +982,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate) {
     companyInfo:  currentClient?.companyInfo || null,
     projectFields: freeFields,
     issueDate:    issueDate || calcIssueDate('末日'),
+    honorific:    currentPartner?.honorific || '御中',
   };
   const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
     method: 'POST',
