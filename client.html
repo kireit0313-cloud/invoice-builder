@@ -551,6 +551,14 @@ function renderPartnerList() {
       <!-- 取引先追加 -->
       <div class="add-partner-area" style="margin-top:1rem;">
         <input type="text" class="add-partner-input" id="newPartnerName" placeholder="取引先名を入力">
+        <select id="newPartnerIssueDay" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
+          <option value="末日">締め日：末日</option>
+          <option value="25">締め日：25日</option>
+          <option value="20">締め日：20日</option>
+          <option value="15">締め日：15日</option>
+          <option value="10">締め日：10日</option>
+          <option value="手入力">締め日：手入力</option>
+        </select>
         <button class="add-partner-btn" onclick="addPartner()">追加</button>
       </div>
     </div>
@@ -622,10 +630,12 @@ window.deletePartnerById = async function(el) {
 window.addPartner = async function() {
   const nameInput = document.getElementById('newPartnerName');
   const name = nameInput.value.trim();
+  const issueDay = document.getElementById('newPartnerIssueDay').value;
   if (!name) { alert('取引先名を入力してください。'); return; }
   try {
     const ref = await addDoc(collection(db, 'clients', clientId, 'partners'), {
       partnerName: name,
+      issueDay: issueDay,
       lineItems: [],
       freeFields: currentClient.projectFields || [],
       createdAt: serverTimestamp(),
@@ -1333,6 +1343,24 @@ window.exportExcel = function() {
 // =====================
 //  ユーティリティ
 // =====================
+// 締め日パターンから発行日文字列を生成
+function calcIssueDate(issueDay) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-indexed
+  if (issueDay === '末日') {
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    return `${y}年${m + 1}月${lastDay}日`;
+  }
+  const day = parseInt(issueDay, 10);
+  if (!isNaN(day)) {
+    return `${y}年${m + 1}月${day}日`;
+  }
+  // 手入力 or 不明な場合は今日の日付を返す
+  const d = now.getDate();
+  return `${y}年${m + 1}月${d}日`;
+}
+
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 function formatDate(d) {
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
