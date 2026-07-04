@@ -944,7 +944,7 @@ window.exportPDF = async function() {
     const items      = getLineItems();
     const freeFields = getFreeFields();
     const issueDate  = getIssueDate();
-    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate);
+    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate, currentPartner.honorific);
 
     // ダウンロード
     const url = URL.createObjectURL(blob);
@@ -974,7 +974,7 @@ window.exportPDF = async function() {
 };
 
 // PDF生成（Cloud Run）
-async function generatePDF(partnerName, items, freeFields, issueDate) {
+async function generatePDF(partnerName, items, freeFields, issueDate, honorific) {
   const payload = {
     clientName:   partnerName,
     items,
@@ -982,7 +982,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate) {
     companyInfo:  currentClient?.companyInfo || null,
     projectFields: freeFields,
     issueDate:    issueDate || calcIssueDate('末日'),
-    honorific:    currentPartner?.honorific || '御中',
+    honorific:    honorific || '御中',
   };
   const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
     method: 'POST',
@@ -1237,7 +1237,7 @@ window.bulkEditExport = async function() {
       const issueDateBulk = p.issueDate || calcIssueDate(p.issueDay || '末日');
 
       try {
-        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk);
+        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific);
         const buf  = await blob.arrayBuffer();
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
