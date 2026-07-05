@@ -284,16 +284,6 @@ body {
     <div class="card">
       <p class="card-title">会社情報・書類設定（PDFに記載する固定情報）</p>
 
-      <label style="font-size:12px;color:var(--ink-soft);">書類タイプ</label>
-      <div style="display:flex;gap:8px;margin:6px 0 14px;">
-        <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
-          <input type="radio" name="docType" value="請求書" checked> 請求書
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
-          <input type="radio" name="docType" value="見積書"> 見積書
-        </label>
-      </div>
-
       <label style="font-size:12px;color:var(--ink-soft);">会社名（屋号）</label>
       <input type="text" id="companyName" class="client-input"
         style="margin-bottom:10px;">
@@ -562,10 +552,6 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const defaultTaxRateInput = document.getElementById('defaultTaxRate').value;
   const defaultTaxRate = defaultTaxRateInput === '' ? 10 : (parseInt(defaultTaxRateInput) || 0);
 
-  // 書類タイプ（見積書／請求書）
-  const docTypeInput = document.querySelector('input[name="docType"]:checked');
-  const docType = docTypeInput ? docTypeInput.value : '請求書';
-
   // 会社情報（固定情報）
   const customFields = [];
   document.querySelectorAll('#customFieldsArea .custom-field-row').forEach(row => {
@@ -615,7 +601,6 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       clientId: clientId,
       columns: columns,
       defaultTaxRate: defaultTaxRate,
-      docType: docType,
       companyInfo: companyInfo,
       projectFields: projectFields,
       createdBy: user.uid,
@@ -708,13 +693,6 @@ window.editClient = async function(clientId) {
     document.getElementById('defaultTaxRate').value =
       (d.defaultTaxRate !== undefined && d.defaultTaxRate !== null) ? d.defaultTaxRate : 10;
 
-    // 書類タイプ
-    const docType = d.docType === '見積書' ? '見積書' : '請求書';
-    document.querySelectorAll('input[name="docType"]').forEach(r => {
-      r.checked = (r.value === docType);
-    });
-    toggleBankInfoVisibility();
-
     // 会社情報
     const company = d.companyInfo || {};
     document.getElementById('companyName').value = company.name || '';
@@ -781,22 +759,6 @@ function addProjectFieldRow(label = '', value = '') {
 }
 
 document.getElementById('addProjectFieldBtn').addEventListener('click', () => addProjectFieldRow());
-
-// 書類タイプ切替で振込先欄の表示・非表示を切り替え
-function toggleBankInfoVisibility() {
-  const checked = document.querySelector('input[name="docType"]:checked');
-  const bankArea = document.getElementById('bankInfoArea');
-  if (checked && checked.value === '見積書') {
-    bankArea.style.display = 'none';
-  } else {
-    bankArea.style.display = 'block';
-  }
-}
-document.querySelectorAll('input[name="docType"]').forEach(radio => {
-  radio.addEventListener('change', toggleBankInfoVisibility);
-});
-toggleBankInfoVisibility();
-
 </script>
 
 </body>
