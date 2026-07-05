@@ -386,7 +386,7 @@ body {
       設定を保存する
     </button>
 
-    <!-- ④クライアント一覧カード -->
+    <!-- クライアント一覧カード -->
     <div class="card">
       <p class="card-title">登録済みクライアント一覧</p>
       <table class="client-list-table">
@@ -402,7 +402,14 @@ body {
         </tbody>
       </table>
     </div>
-
+   <!-- バックアップカード -->
+    <div class="card">
+      <p class="card-title">データのバックアップ</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
+        全クライアントの設定・取引先データをJSONファイルとしてダウンロードします。定期的な保管用にご利用ください。
+      </p>
+      <button type="button" class="upload-btn" id="backupBtn">バックアップをダウンロード（JSON）</button>
+    </div>
     <!-- アップロード前のヒント -->
     <p class="hint" id="hintMsg">
       Excelファイルをアップロードすると、列が自動で判定されます
@@ -710,6 +717,47 @@ window.deleteClient = async function(clientId, clientName) {
     alert('削除に失敗しました：' + e.message);
   }
 };
+  // ========== データのバックアップ（全クライアント＋取引先をJSONで出力） ==========
+
+document.getElementById('backupBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('backupBtn');
+  btn.disabled = true;
+  btn.textContent = '準備中...';
+
+  try {
+    const clientsSnap = await getDocs(collection(db, 'clients'));
+    const backup = [];
+
+    for (const clientDoc of clientsSnap.docs) {
+      const clientData = { id: clientDoc.id, ...clientDoc.data() };
+
+      const partnersSnap = await getDocs(collection(db, 'clients', clientDoc.id, 'partners'));
+      clientData.partners = partnersSnap.docs.map(p => ({ id: p.id, ...p.data() }));
+
+      backup.push(clientData);
+    }
+
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const now = new Date();
+    const ymd = now.getFullYear()
+      + String(now.getMonth() + 1).padStart(2, '0')
+      + String(now.getDate()).padStart(2, '0');
+    a.download = `invoice-builder-backup_${ymd}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch(e) {
+    alert('バックアップの取得に失敗しました：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'バックアップをダウンロード（JSON）';
+  }
+});
   
 // ========== 既存クライアントの編集（フォームへの復元） ==========
 
