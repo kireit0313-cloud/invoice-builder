@@ -950,6 +950,7 @@ window.exportPDF = async function() {
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
     a.href    = url;
+    const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
     a.download = `${docLabel}_${currentPartner.partnerName}_${todayStr().replace(/-/g,'')}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
