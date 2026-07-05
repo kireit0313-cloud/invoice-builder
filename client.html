@@ -950,7 +950,7 @@ window.exportPDF = async function() {
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
     a.href    = url;
-    a.download = `${currentPartner.partnerName}_${todayStr()}.pdf`;
+    a.download = `${docLabel}_${currentPartner.partnerName}_${todayStr().replace(/-/g,'')}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -1435,7 +1435,8 @@ window.exportExcel = function() {
   ws['!cols'] = [{wch:14},{wch:24},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '明細');
-  XLSX.writeFile(wb, `${name}_${todayStr()}.xlsx`);
+  const _xlsLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
+  XLSX.writeFile(wb, `${_xlsLabel}_${name}_${todayStr().replace(/-/g,'')}.xlsx`);
 };
 
 // =====================
