@@ -410,6 +410,30 @@ body {
       </p>
       <button type="button" class="upload-btn" id="backupBtn">バックアップをダウンロード（JSON）</button>
     </div>
+
+    <!-- 復元カード -->
+    <div class="card">
+      <p class="card-title">データの復元（クライアント単位）</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
+        バックアップJSONファイルから、クライアントを1件選んで復元します。復元すると、そのクライアントの現在のデータ（設定・取引先）はすべて上書きされます。
+      </p>
+      <div class="upload-area">
+        <div>📁 バックアップJSONファイルをここに選択</div>
+        <div style="font-size:11px; margin-top:4px;">対応形式：.json</div>
+        <button class="upload-btn" onclick="document.getElementById('restoreFileInput').click()">
+          ファイルを選択
+        </button>
+        <input type="file" id="restoreFileInput" accept=".json" style="display:none">
+      </div>
+
+      <div id="restoreSelectArea" style="display:none;margin-top:14px;">
+        <label style="font-size:12px;color:var(--ink-soft);">復元するクライアントを選択</label>
+        <select id="restoreClientSelect" class="client-input" style="margin-top:6px;"></select>
+        <button type="button" class="upload-btn" id="restoreBtn"
+          style="margin-top:10px;background:#c0392b;">このクライアントを復元する</button>
+      </div>
+    </div>
+
     <!-- アップロード前のヒント -->
     <p class="hint" id="hintMsg">
       Excelファイルをアップロードすると、列が自動で判定されます
@@ -422,7 +446,7 @@ body {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, getDocs, orderBy, query }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, serverTimestamp, Timestamp, collection, getDocs, orderBy, query }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -756,6 +780,95 @@ document.getElementById('backupBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = 'バックアップをダウンロード（JSON）';
+  }
+});
+  // ========== データの復元（クライアント単位） ==========
+
+let restoreBackupData = null;
+
+// Firestore Timestampの復元用ヘルパー（バックアップJSON内の{seconds, nanoseconds}をTimestampに戻す）
+function restoreTimestamps(obj, keys) {
+  keys.forEach(key => {
+    const v = obj[key];
+    if (v && typeof v === 'object' && typeof v.seconds === 'number') {
+      obj[key] = new Timestamp(v.seconds, v.nanoseconds || 0);
+    }
+  });
+  return obj;
+}
+
+document.getElementById('restoreFileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) {
+      alert('バックアップファイルの形式が正しくありません。');
+      return;
+    }
+
+    restoreBackupData = data;
+    const select = document.getElementById('restoreClientSelect');
+    select.innerHTML = data.map(c =>
+      `<option value="${c.id}">${(c.clientName || '(名称未設定)')}</option>`
+    ).join('');
+    document.getElementById('restoreSelectArea').style.display = 'block';
+  } catch(err) {
+    alert('ファイルの読み込みに失敗しました：' + err.message);
+  }
+});
+
+document.getElementById('restoreBtn').addEventListener('click', async () => {
+  if (!restoreBackupData) return;
+
+  const select = document.getElementById('restoreClientSelect');
+  const targetId = select.value;
+  const clientData = restoreBackupData.find(c => c.id === targetId);
+  if (!clientData) return;
+
+  const ok = confirm(
+    `「${clientData.clientName}」のデータを復元します。\n` +
+    `現在のこのクライアントのデータ（設定・取引先）はすべて上書き・削除され、バックアップ時点の状態に戻ります。\n` +
+    `よろしいですか？`
+  );
+  if (!ok) return;
+
+  const btn = document.getElementById('restoreBtn');
+  btn.disabled = true;
+  btn.textContent = '復元中...';
+
+  try {
+    const { id, partners, ...clientFields } = clientData;
+    restoreTimestamps(clientFields, ['createdAt', 'updatedAt']);
+
+    // 既存の取引先を先に削除（バックアップ時点の状態に完全に合わせるため）
+    const existingPartners = await getDocs(collection(db, 'clients', id, 'partners'));
+    for (const p of existingPartners.docs) {
+      await deleteDoc(doc(db, 'clients', id, 'partners', p.id));
+    }
+
+    // クライアント本体を復元
+    await setDoc(doc(db, 'clients', id), clientFields);
+
+    // 取引先を復元
+    for (const p of (partners || [])) {
+      const { id: partnerId, ...partnerFields } = p;
+      restoreTimestamps(partnerFields, ['updatedAt']);
+      await setDoc(doc(db, 'clients', id, 'partners', partnerId), partnerFields);
+    }
+
+    alert('復元が完了しました。');
+    loadClientList();
+    restoreBackupData = null;
+    document.getElementById('restoreSelectArea').style.display = 'none';
+    document.getElementById('restoreFileInput').value = '';
+  } catch(e) {
+    alert('復元に失敗しました：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'このクライアントを復元する';
   }
 });
   
