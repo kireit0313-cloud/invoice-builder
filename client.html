@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>見積書・請求書入力</title>
+<title>請求書入力</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -437,7 +437,7 @@ body {
     <button class="back-btn" id="backBtn" onclick="showPartnerList()">← 取引先一覧</button>
     <div>
       <div class="header-title" id="headerTitle">読み込み中...</div>
-      <div class="header-sub" id="headerSub">請求書・見積書入力</div>
+      <div class="header-sub" id="headerSub">請求書入力</div>
     </div>
   </div>
 </div>
@@ -499,8 +499,7 @@ window.showPartnerList = async function() {
   currentPartner = null;
   currentPartnerId = null;
   document.getElementById('backBtn').style.display = 'none';
-  const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
-  document.getElementById('headerSub').textContent = docLabel + '入力';
+  document.getElementById('headerSub').textContent = '請求書入力';
 
   // Firestoreから取引先一覧を取得
   const snap = await getDocs(collection(db, 'clients', clientId, 'partners'));
@@ -512,7 +511,6 @@ window.showPartnerList = async function() {
 };
 
 function renderPartnerList() {
-  const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
   const body = document.getElementById('mainBody');
   body.innerHTML = `
     <!-- 取引先一覧 -->
@@ -663,8 +661,7 @@ window.addPartner = async function() {
 // =====================
 function showDetailScreen(partner, imported) {
   document.getElementById('backBtn').style.display = 'inline-block';
-  const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
-  document.getElementById('headerSub').textContent = partner.partnerName + ' ｜ ' + docLabel + '入力';
+  document.getElementById('headerSub').textContent = partner.partnerName + ' ｜ 請求書入力';
 
   rowCount = 0;
   const body = document.getElementById('mainBody');
@@ -950,8 +947,7 @@ window.exportPDF = async function() {
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
     a.href    = url;
-    const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
-    a.download = `${docLabel}_${currentPartner.partnerName}_${todayStr().replace(/-/g,'')}.pdf`;
+    a.download = `請求書_${currentPartner.partnerName}_${todayStr().replace(/-/g,'')}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -979,7 +975,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate, honorific)
   const payload = {
     clientName:   partnerName,
     items,
-    docType:      currentClient?.docType || '請求書',
+    docType:      '請求書',
     companyInfo:  currentClient?.companyInfo || null,
     projectFields: freeFields,
     issueDate:    issueDate || calcIssueDate('末日'),
@@ -1226,7 +1222,7 @@ window.bulkEditExport = async function() {
 
   try {
     const zip = new JSZip();
-    const docLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
+    const docLabel = '請求書';
     const today = todayStr();
 
     for (let i = 0; i < targets.length; i++) {
@@ -1439,8 +1435,7 @@ window.exportExcel = function() {
   ws['!cols'] = [{wch:14},{wch:24},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '明細');
-  const _xlsLabel = currentClient.docType === '見積書' ? '見積書' : '請求書';
-  XLSX.writeFile(wb, `${_xlsLabel}_${name}_${todayStr().replace(/-/g,'')}.xlsx`);
+  XLSX.writeFile(wb, `請求書_${name}_${todayStr().replace(/-/g,'')}.xlsx`);
 };
 
 // =====================
