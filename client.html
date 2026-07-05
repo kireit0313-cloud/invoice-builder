@@ -1245,7 +1245,7 @@ window.bulkEditExport = async function() {
 
         // Excel生成してZIPに追加
         const L = getColumnLabels();
-        const xlsData = [[L[0], L[1], '数量', '単価（円）', '金額（円）', '税率（%）', L[5]]];
+        const xlsData = [[L[0], L[1], L[2], L[3], L[4], '税率（%）', L[5]]];
         items.forEach(it => {
           xlsData.push([
             it.date, it.service,
@@ -1408,7 +1408,7 @@ window.saveCompanyInfo = async function() {
 window.exportExcel = function() {
   const name = currentPartner?.partnerName || 'document';
   const L = getColumnLabels();
-  const data = [[L[0], L[1], '数量', '単価（円）', '金額（円）', '税率（%）', L[5]]];
+  const data = [[L[0], L[1], L[2], L[3], L[4], '税率（%）', L[5]]];
   const rows = document.querySelectorAll('#itemsBody tr');
   rows.forEach(row => {
     const f = rowInputs(row);
