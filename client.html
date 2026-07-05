@@ -984,6 +984,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate, honorific)
     projectFields: freeFields,
     issueDate:    issueDate || calcIssueDate('末日'),
     honorific:    honorific || '御中',
+    columnLabels: getColumnLabels(),
   };
   const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
     method: 'POST',
