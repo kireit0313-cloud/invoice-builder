@@ -499,6 +499,7 @@ window.showPartnerList = async function() {
   currentPartner = null;
   currentPartnerId = null;
   document.getElementById('backBtn').style.display = 'none';
+  document.getElementById('headerTitle').textContent = currentClient.clientName + ' 様';
   document.getElementById('headerSub').textContent = '請求書入力';
 
   // Firestoreから取引先一覧を取得
@@ -662,7 +663,8 @@ window.addPartner = async function() {
 // =====================
 function showDetailScreen(partner, imported) {
   document.getElementById('backBtn').style.display = 'inline-block';
-  document.getElementById('headerSub').textContent = partner.partnerName + ' ｜ 請求書入力';
+  document.getElementById('headerTitle').textContent = partner.partnerName;
+  document.getElementById('headerSub').textContent = '請求書入力';
 
   rowCount = 0;
   const body = document.getElementById('mainBody');
