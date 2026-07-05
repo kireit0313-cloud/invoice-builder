@@ -699,13 +699,13 @@ function showDetailScreen(partner, imported) {
         <table class="items-table">
           <thead>
             <tr>
-              <th class="col-date">作業日</th>
-              <th class="col-service">サービス名</th>
-              <th class="col-qty">数量</th>
-              <th class="col-price">単価（円）</th>
-              <th class="col-amount">金額（円）</th>
+              <th class="col-date">${getColumnLabels()[0]}</th>
+              <th class="col-service">${getColumnLabels()[1]}</th>
+              <th class="col-qty">${getColumnLabels()[2]}</th>
+              <th class="col-price">${getColumnLabels()[3]}</th>
+              <th class="col-amount">${getColumnLabels()[4]}</th>
               <th class="col-tax">税率（%）</th>
-              <th class="col-remark">備考</th>
+              <th class="col-remark">${getColumnLabels()[5]}</th>
               <th class="col-delete"></th>
             </tr>
           </thead>
@@ -1045,13 +1045,13 @@ window.openBulkEditMode = function() {
           <table class="items-table">
             <thead>
               <tr>
-                <th class="col-date">作業日</th>
-                <th class="col-service">サービス名</th>
-                <th class="col-qty">数量</th>
-                <th class="col-price">単価（円）</th>
-                <th class="col-amount">金額（円）</th>
+                <th class="col-date">${getColumnLabels()[0]}</th>
+                <th class="col-service">${getColumnLabels()[1]}</th>
+                <th class="col-qty">${getColumnLabels()[2]}</th>
+                <th class="col-price">${getColumnLabels()[3]}</th>
+                <th class="col-amount">${getColumnLabels()[4]}</th>
                 <th class="col-tax">税率（%）</th>
-                <th class="col-remark">備考</th>
+                <th class="col-remark">${getColumnLabels()[5]}</th>
                 <th class="col-delete"></th>
               </tr>
             </thead>
@@ -1243,7 +1243,8 @@ window.bulkEditExport = async function() {
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
         // Excel生成してZIPに追加
-        const xlsData = [['作業日','サービス名','数量','単価（円）','金額（円）','税率（%）','備考']];
+        const L = getColumnLabels();
+        const xlsData = [[L[0], L[1], '数量', '単価（円）', '金額（円）', '税率（%）', L[5]]];
         items.forEach(it => {
           xlsData.push([
             it.date, it.service,
@@ -1405,7 +1406,8 @@ window.saveCompanyInfo = async function() {
 // =====================
 window.exportExcel = function() {
   const name = currentPartner?.partnerName || 'document';
-  const data = [['作業日','サービス名','数量','単価（円）','金額（円）','税率（%）','備考']];
+  const L = getColumnLabels();
+  const data = [[L[0], L[1], '数量', '単価（円）', '金額（円）', '税率（%）', L[5]]];
   const rows = document.querySelectorAll('#itemsBody tr');
   rows.forEach(row => {
     const f = rowInputs(row);
@@ -1486,6 +1488,14 @@ function getIssueDate() {
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
+// 列ラベル取得（Excelのcolumnsから、なければデフォルト）
+// 順序：作業日・サービス名・数量・単価・金額・備考（税率は固定・対象外）
+function getColumnLabels() {
+  const defaults = ['作業日','サービス名','数量','単価（円）','金額（円）','備考'];
+  const cols = currentClient?.columns;
+  if (!cols || cols.length === 0) return defaults;
+  return defaults.map((def, i) => (cols[i] && cols[i].name) ? cols[i].name : def);
+}  
 function formatDate(d) {
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
 }
