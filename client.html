@@ -642,6 +642,7 @@ window.addPartner = async function() {
       issueDay: issueDay,
       lineItems: [],
       freeFields: currentClient.projectFields || [],
+      remarksLower: currentClient.remarksLower || '',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -679,9 +680,9 @@ function showDetailScreen(partner, imported) {
       </div>
     </div>
 
-    <!-- 自由記入欄 -->
+    <!-- 自由項目記入欄（上段） -->
     <div class="card">
-      <p class="card-title">自由記入欄（任意）</p>
+      <p class="card-title">自由項目記入欄（上段）</p>
       <div class="free-fields" id="freeFieldsArea"></div>
       <button class="add-field-btn" onclick="addFreeField('','')">＋ 項目を追加</button>
     </div>
@@ -716,6 +717,14 @@ function showDetailScreen(partner, imported) {
       <div class="totals" id="totalsArea"></div>
     </div>
 
+    <!-- 自由記入欄（下段） -->
+    <div class="card">
+      <p class="card-title">自由記入欄（下段）</p>
+      <p class="hint" style="margin-top:-6px;">備考など。未記入の場合はPDFに表示されません。</p>
+      <textarea id="remarksLowerInput" class="free-fields"
+        style="width:100%;min-height:70px;resize:vertical;font-family:inherit;font-size:14px;padding:8px;box-sizing:border-box;"></textarea>
+    </div>
+
     <!-- アクション -->
     <div class="actions">
       <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容保存</button>
@@ -729,6 +738,9 @@ function showDetailScreen(partner, imported) {
   if (freeFields.length > 0) {
     freeFields.forEach(f => addFreeField(f.label, f.value));
   }
+
+  // 自由記入欄（下段）の初期表示
+  document.getElementById('remarksLowerInput').value = partner.remarksLower || '';
 
   // 明細の初期描画（先月データがあればインポート、なければ空行1行）
   if (partner.lineItems && partner.lineItems.length > 0) {
@@ -911,16 +923,19 @@ window.savePartnerData = async function() {
     const items      = getLineItems();
     const freeFields = getFreeFields();
     const issueDate  = getIssueDate();
+    const remarksLower = document.getElementById('remarksLowerInput').value.trim();
     await setDoc(doc(db, 'clients', clientId, 'partners', currentPartnerId), {
       partnerName: currentPartner.partnerName,
       issueDate:   issueDate,
       lineItems:   items,
       freeFields:  freeFields,
+      remarksLower: remarksLower,
       updatedAt:   serverTimestamp(),
     }, { merge: true });
     currentPartner.lineItems  = items;
     currentPartner.freeFields = freeFields;
     currentPartner.issueDate  = issueDate;
+    currentPartner.remarksLower = remarksLower;
     btn.textContent = '保存しました ✓';
     setTimeout(() => { btn.textContent = '内容保存'; btn.disabled = false; }, 2000);
   } catch(e) {
@@ -941,7 +956,8 @@ window.exportPDF = async function() {
     const items      = getLineItems();
     const freeFields = getFreeFields();
     const issueDate  = getIssueDate();
-    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate, currentPartner.honorific);
+    const remarksLower = document.getElementById('remarksLowerInput').value.trim();
+    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate, currentPartner.honorific, remarksLower);
 
     // ダウンロード
     const url = URL.createObjectURL(blob);
@@ -956,11 +972,13 @@ window.exportPDF = async function() {
       partnerName: currentPartner.partnerName,
       lineItems:   items,
       freeFields:  freeFields,
+      remarksLower: remarksLower,
       updatedAt:   serverTimestamp(),
     }, { merge: true });
 
     currentPartner.lineItems  = items;
     currentPartner.freeFields = freeFields;
+    currentPartner.remarksLower = remarksLower;
 
   } catch(e) {
     alert('PDF生成に失敗しました：' + e.message);
@@ -971,13 +989,14 @@ window.exportPDF = async function() {
 };
 
 // PDF生成（Cloud Run）
-async function generatePDF(partnerName, items, freeFields, issueDate, honorific) {
+async function generatePDF(partnerName, items, freeFields, issueDate, honorific, remarksLower) {
   const payload = {
     clientName:   partnerName,
     items,
     docType:      '請求書',
     companyInfo:  currentClient?.companyInfo || null,
     projectFields: freeFields,
+    remarksLower: remarksLower || '',
     issueDate:    issueDate || calcIssueDate('末日'),
     honorific:    honorific || '御中',
     columnLabels: getColumnLabels(),
@@ -1199,6 +1218,7 @@ window.bulkSaveAll = async function() {
         issueDate:   issueDate,
         lineItems:   items,
         freeFields:  p.freeFields || [],
+        remarksLower: p.remarksLower || '',
         updatedAt:   serverTimestamp(),
       }, { merge: true });
     }
@@ -1232,10 +1252,11 @@ window.bulkEditExport = async function() {
 
       const items = bulkGetLineItems(tableId);
       const freeFields = p.freeFields || [];
+      const remarksLower = p.remarksLower || '';
       const issueDateBulk = p.issueDate || calcIssueDate(p.issueDay || '末日');
 
       try {
-        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific);
+        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific, remarksLower);
         const buf  = await blob.arrayBuffer();
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
@@ -1283,6 +1304,7 @@ window.bulkEditExport = async function() {
           partnerName: p.partnerName,
           lineItems:   items,
           freeFields:  freeFields,
+          remarksLower: remarksLower,
           updatedAt:   serverTimestamp(),
         }, { merge: true });
 
