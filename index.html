@@ -271,7 +271,7 @@ body {
 
     <!-- ①クライアント名入力カード -->
     <div class="card">
-      <p class="card-title">① クライアント名を入力</p>
+      <p class="card-title">クライアント名を入力</p>
       <input type="text" id="clientName" class="client-input">
       <input type="hidden" id="editingClientId" value="">
       <div id="editingBadge" style="display:none;margin-top:8px;font-size:12px;color:var(--ink-soft);">
@@ -321,15 +321,25 @@ body {
       </p>
     </div>
 
-    <!-- 案件情報・送付先情報カード（会社情報とは独立） -->
+    <!-- 自由項目記入欄（上段）カード（会社情報とは独立） -->
     <div class="card">
-      <p class="card-title">案件情報・送付先情報（自由項目）</p>
+      <p class="card-title">自由項目記入欄（上段）</p>
       <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 10px;">
         工事先住所、送付先住所など、会社情報とは関連しない項目用です。PDFの会社情報欄とは別の場所に、独立した形で表示されます。
       </p>
       <div id="projectFieldsArea"></div>
       <button type="button" class="upload-btn" id="addProjectFieldBtn"
         style="margin-top:6px;">＋ 項目を追加</button>
+    </div>
+
+    <!-- 自由記入欄（下段）カード：備考欄 -->
+    <div class="card">
+      <p class="card-title">自由記入欄（下段）</p>
+      <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 10px;">
+        備考など、自由に記入できる欄です。未記入の場合はPDFに表示されません。
+      </p>
+      <textarea id="remarksLower" class="client-input" rows="3"
+        style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
     </div>
 
     <!-- デフォルト税率設定カード -->
@@ -345,7 +355,7 @@ body {
 
     <!-- ②Excelアップロードカード -->
     <div class="card">
-      <p class="card-title">② Excelテンプレートをアップロード</p>
+      <p class="card-title">Excelテンプレートをアップロード</p>
       <div class="upload-area">
         <div>📁 Excelファイルをここに選択</div>
         <div style="font-size:11px; margin-top:4px;">対応形式：.xlsx / .xls</div>
@@ -358,7 +368,7 @@ body {
 
     <!-- ③列確認テーブルカード（初期は非表示） -->
     <div class="card" id="colsCard" style="display:none">
-      <p class="card-title">③ 列の種類を確認・修正</p>
+      <p class="card-title">列の種類を確認・修正</p>
       <table class="cols-table">
         <thead>
           <tr>
@@ -378,7 +388,7 @@ body {
 
     <!-- ④クライアント一覧カード -->
     <div class="card">
-      <p class="card-title">④ 登録済みクライアント一覧</p>
+      <p class="card-title">登録済みクライアント一覧</p>
       <table class="client-list-table">
         <thead>
           <tr>
@@ -405,7 +415,7 @@ body {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp, collection, getDocs, orderBy, query }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, getDocs, orderBy, query }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -523,13 +533,13 @@ document.getElementById('newClientBtn').addEventListener('click', () => {
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const clientName = document.getElementById('clientName').value.trim();
   if (!clientName) {
-    alert('① クライアント名を入力してください');
+    alert('クライアント名を入力してください');
     return;
   }
 
   const rows = document.querySelectorAll('#colsBody tr');
   if (rows.length === 0) {
-    alert('② Excelファイルをアップロードしてください');
+    alert('Excelファイルをアップロードしてください');
     return;
   }
 
@@ -582,7 +592,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       projectFields.push({ label, value });
     }
   });
-
+  // 自由記入欄（下段・備考）
+  const remarksLower = document.getElementById('remarksLower').value.trim();
+  
   try {
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.textContent = '保存中...';
@@ -603,6 +615,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       defaultTaxRate: defaultTaxRate,
       companyInfo: companyInfo,
       projectFields: projectFields,
+      remarksLower: remarksLower,
       createdBy: user.uid,
       createdAt: createdAt,
       updatedAt: serverTimestamp()
@@ -653,6 +666,9 @@ async function loadClientList() {
           <button class="copy-url-btn" onclick="editClient('${docSnap.id}')">
             編集
           </button>
+          <button class="copy-url-btn" style="color:#c0392b;border-color:#e6b3ab;" onclick="deleteClient('${docSnap.id}', '${d.clientName.replace(/'/g, "\\'")}')">
+            削除
+          </button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -672,7 +688,29 @@ window.copyUrl = function(btn, url) {
     }, 2000);
   });
 };
+// ========== クライアントの削除 ==========
 
+window.deleteClient = async function(clientId, clientName) {
+  const ok = confirm(`「${clientName}」を削除します。\nこのクライアントの設定・取引先データはすべて削除され、元に戻せません。\n本当に削除しますか？`);
+  if (!ok) return;
+
+  try {
+    // 取引先（partners）サブコレクションを先に削除
+    const partnersSnap = await getDocs(collection(db, 'clients', clientId, 'partners'));
+    for (const p of partnersSnap.docs) {
+      await deleteDoc(doc(db, 'clients', clientId, 'partners', p.id));
+    }
+
+    // クライアント本体を削除
+    await deleteDoc(doc(db, 'clients', clientId));
+
+    alert('削除しました。');
+    loadClientList();
+  } catch(e) {
+    alert('削除に失敗しました：' + e.message);
+  }
+};
+  
 // ========== 既存クライアントの編集（フォームへの復元） ==========
 
 window.editClient = async function(clientId) {
@@ -705,9 +743,12 @@ window.editClient = async function(clientId) {
     document.getElementById('customFieldsArea').innerHTML = '';
     (company.customFields || []).forEach(f => addCustomFieldRow(f.label, f.value));
 
-    // 案件情報・送付先情報
+    // 自由項目記入欄（上段）
     document.getElementById('projectFieldsArea').innerHTML = '';
     (d.projectFields || []).forEach(f => addProjectFieldRow(f.label, f.value));
+
+    // 自由記入欄（下段・備考）
+    document.getElementById('remarksLower').value = d.remarksLower || '';
 
     // 列設定（Excel再アップロード不要で復元）
     if (d.columns && d.columns.length > 0) {
