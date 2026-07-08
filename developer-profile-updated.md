@@ -51,12 +51,14 @@
 1. 一度に大きく進めず、1ステップずつ確認しながら進める
 2. コードは差分方式で行う
    → GitHub WebUIでの貼り替え作業がしやすいように張替の位置を示す。行数が分かればなおよい。
+   → ※2026/7/8以降は「ローカルミラー(接続フォルダ)直接編集＋変更ファイルのみUpload」を基本とする（詳細は`invoice-builder-CONTEXT.md`「開発の進め方」参照）。
 3. 専門用語は都度かみ砕いて説明する
 4. 迷ったときはIdea Loomの構成を参考にする
 5. 各ステップ完了後にスクリーンショットで確認する
-6. GitHubのファイル取得は`curl`コマンドで行う（`web_fetch`は制限あり）
-   例：`curl -s https://raw.githubusercontent.com/kireit0313-cloud/invoice-builder/main/client.html`
+6. GitHubのファイル取得は`web_fetch`で`raw.githubusercontent.com`を読む（bashの`curl`等でのURL取得は不可）
+   例：`https://raw.githubusercontent.com/kireit0313-cloud/invoice-builder/main/client.html`
 7. **新しいセッションの開始時は`invoice-builder-CONTEXT.md`を読み込んでから作業を始める**
+   → 読み込み元は接続フォルダ`見積請求PWA開発/invoice-builder/`を優先。未接続のときだけGitHubから読む。編集後は必ずGitHubにもUploadして同期する。
 
 ## 機能要件・開発フェーズ・競合ポジションについて
 
