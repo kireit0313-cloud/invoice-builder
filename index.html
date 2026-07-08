@@ -280,9 +280,9 @@ body {
       </div>
     </div>
 
-    <!-- 会社情報・書類設定カード -->
+    <!-- 会社情報カード -->
     <div class="card">
-      <p class="card-title">会社情報・書類設定（PDFに記載する固定情報）</p>
+      <p class="card-title">会社情報</p>
 
       <label style="font-size:12px;color:var(--ink-soft);">会社名（屋号）</label>
       <input type="text" id="companyName" class="client-input"
@@ -319,27 +319,6 @@ body {
       <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">
         この情報はクライアントごとに保存され、PDF出力時に自動で差し込まれます。クライアントが変更したり目にすることはありません。
       </p>
-    </div>
-
-    <!-- 自由項目記入欄（上段）カード（会社情報とは独立） -->
-    <div class="card">
-      <p class="card-title">自由項目記入欄（上段）</p>
-      <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 10px;">
-        工事先住所、送付先住所など、会社情報とは関連しない項目用です。PDFの会社情報欄とは別の場所に、独立した形で表示されます。
-      </p>
-      <div id="projectFieldsArea"></div>
-      <button type="button" class="upload-btn" id="addProjectFieldBtn"
-        style="margin-top:6px;">＋ 項目を追加</button>
-    </div>
-
-    <!-- 自由記入欄（下段）カード：備考欄 -->
-    <div class="card">
-      <p class="card-title">自由記入欄（下段）</p>
-      <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 10px;">
-        備考など、自由に記入できる欄です。未記入の場合はPDFに表示されません。
-      </p>
-      <textarea id="remarksLower" class="client-input" rows="3"
-        style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
     </div>
 
     <!-- デフォルト税率設定カード -->
@@ -613,19 +592,6 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     customFields: customFields,
   };
 
-  // 案件情報・送付先情報（会社情報とは独立）
-  const projectFields = [];
-  document.querySelectorAll('#projectFieldsArea .project-field-row').forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const label = inputs[0].value.trim();
-    const value = inputs[1].value.trim();
-    if (label && value) {
-      projectFields.push({ label, value });
-    }
-  });
-  // 自由記入欄（下段・備考）
-  const remarksLower = document.getElementById('remarksLower').value.trim();
-  
   try {
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.textContent = '保存中...';
@@ -645,8 +611,6 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       columns: columns,
       defaultTaxRate: defaultTaxRate,
       companyInfo: companyInfo,
-      projectFields: projectFields,
-      remarksLower: remarksLower,
       createdBy: user.uid,
       createdAt: createdAt,
       updatedAt: serverTimestamp()
@@ -871,7 +835,7 @@ document.getElementById('restoreBtn').addEventListener('click', async () => {
     btn.textContent = 'このクライアントを復元する';
   }
 });
-  
+
 // ========== 既存クライアントの編集（フォームへの復元） ==========
 
 window.editClient = async function(clientId) {
@@ -904,13 +868,6 @@ window.editClient = async function(clientId) {
     document.getElementById('customFieldsArea').innerHTML = '';
     (company.customFields || []).forEach(f => addCustomFieldRow(f.label, f.value));
 
-    // 自由項目記入欄（上段）
-    document.getElementById('projectFieldsArea').innerHTML = '';
-    (d.projectFields || []).forEach(f => addProjectFieldRow(f.label, f.value));
-
-    // 自由記入欄（下段・備考）
-    document.getElementById('remarksLower').value = d.remarksLower || '';
-
     // 列設定（Excel再アップロード不要で復元）
     if (d.columns && d.columns.length > 0) {
       showColumnsTableFromSaved(d.columns);
@@ -941,26 +898,6 @@ function addCustomFieldRow(label = '', value = '') {
 }
 
 document.getElementById('addCustomFieldBtn').addEventListener('click', () => addCustomFieldRow());
-
-// ========== 案件情報・送付先情報（会社情報とは独立した自由項目） ==========
-
-function addProjectFieldRow(label = '', value = '') {
-  const area = document.getElementById('projectFieldsArea');
-  const row = document.createElement('div');
-  row.className = 'project-field-row';
-  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
-  row.innerHTML = `
-    <input type="text" class="client-input"
-      style="flex:1;margin-bottom:0;" value="${label.replace(/"/g, '&quot;')}">
-    <input type="text" class="client-input"
-      style="flex:1.5;margin-bottom:0;" value="${value.replace(/"/g, '&quot;')}">
-    <button type="button" class="delete-field-btn">×</button>
-  `;
-  row.querySelector('.delete-field-btn').addEventListener('click', () => row.remove());
-  area.appendChild(row);
-}
-
-document.getElementById('addProjectFieldBtn').addEventListener('click', () => addProjectFieldRow());
 </script>
 
 </body>
