@@ -332,6 +332,32 @@ body {
   flex-shrink: 0;
 }
 .field-move-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 会社情報編集：スマホ幅で項目名・内容を縦積みにする（▲▼と×は上段） */
+@media (max-width: 480px) {
+  #companyCustomFields .free-field-row {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  #companyCustomFields .field-move-btn { order: 1; }
+  #companyCustomFields .free-field-del {
+    order: 2;
+    margin-left: auto;
+    font-size: 20px;
+    padding: 4px 8px;
+  }
+  #companyCustomFields .free-field-label {
+    order: 3;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  #companyCustomFields .free-field-value {
+    order: 4;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}
 .add-field-btn {
   padding: 7px 14px;
   background: none;
