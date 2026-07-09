@@ -438,6 +438,20 @@ body {
 .company-edit-grid input:focus, .company-edit-grid textarea:focus { border-color: var(--accent); }
 .company-edit-grid input[readonly] { background: var(--bg); color: var(--ink-soft); cursor: not-allowed; }
 .company-edit-full { grid-column: 1 / -1; }
+/* 印鑑（角印）設定 */
+.seal-toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.seal-mode-row { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--ink); }
+.seal-mode-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.seal-auto-preview {
+  width: 72px; height: 72px; border: 2px solid #C0392B; border-radius: 3px;
+  padding: 4px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; background: #fff;
+}
+.seal-auto-preview-text {
+  writing-mode: vertical-rl; text-orientation: upright; color: #C0392B;
+  font-weight: bold; font-family: serif; line-height: 1.0; max-height: 100%;
+}
+.seal-img-preview { max-width: 72px; max-height: 72px; object-fit: contain; border: 1px solid var(--border); background: #fff; }
 .company-save-btn {
   margin-top: 12px;
   padding: 9px 20px;
@@ -734,8 +748,16 @@ function renderPartnerList() {
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">PDFでは会社情報とは別の場所に表示されます。</p>
       ${buildBankEditHTML()}
     </div>
+
+    <!-- 印鑑（角印）編集 -->
+    <div class="card">
+      <p class="card-title">印鑑（角印）</p>
+      <p class="hint" style="margin-top:-6px;margin-bottom:12px;">請求書PDFの会社情報の下に表示されます。</p>
+      ${buildSealEditHTML()}
+    </div>
   `;
   updateBulkBar();
+  initSealPreviews();
 }
 
 // チェック状態管理
@@ -1626,6 +1648,131 @@ window.saveCompanyInfo = async function() {
     }, { merge: true });
     currentClient.companyInfo = updated;
     showToast('会社情報を保存しました。', 'success');
+  } catch(e) {
+    showToast('保存に失敗しました：' + e.message, 'error');
+  }
+};
+
+// =====================
+//  印鑑（角印）設定
+// =====================
+// seal = { enabled, mode:'auto'|'image', imageData }。クライアント単位でcompanyInfoに保存。
+function buildSealEditHTML() {
+  const c = currentClient?.companyInfo || {};
+  const seal = c.seal || { enabled: true, mode: 'auto', imageData: '' };
+  const enabled = !!seal.enabled;
+  const mode = seal.mode === 'image' ? 'image' : 'auto';
+  window._sealImageData = seal.imageData || '';
+  return `
+    <label class="seal-toggle-row">
+      <input type="checkbox" id="sealEnabled" ${enabled ? 'checked' : ''} onchange="onSealEnabledChange()">
+      <span>請求書に印鑑（角印）を表示する</span>
+    </label>
+    <div id="sealOptions" style="${enabled ? '' : 'display:none;'}margin-top:14px;">
+      <div class="seal-mode-row">
+        <label><input type="radio" name="sealMode" value="auto" ${mode==='auto'?'checked':''} onchange="onSealModeChange()"> 自動生成（社名から作成）</label>
+        <label><input type="radio" name="sealMode" value="image" ${mode==='image'?'checked':''} onchange="onSealModeChange()"> 画像をアップロード</label>
+      </div>
+      <div id="sealAutoBox" style="${mode==='auto'?'':'display:none;'}margin-top:12px;">
+        <p class="hint" style="margin-bottom:8px;">社名「${escHtml(c.name||'')}」から角印を自動生成します。プレビュー：</p>
+        <div id="sealPreviewAuto"></div>
+      </div>
+      <div id="sealImageBox" style="${mode==='image'?'':'display:none;'}margin-top:12px;">
+        <input type="file" id="sealFile" accept="image/*" onchange="handleSealUpload(event)">
+        <p class="hint" style="margin-top:6px;">背景が透過されたPNGを推奨。写真でもそのまま表示されます。</p>
+        <div id="sealPreviewImage" style="margin-top:10px;"></div>
+      </div>
+    </div>
+    <br>
+    <button class="company-save-btn" onclick="saveSealInfo()">印鑑設定を保存</button>
+  `;
+}
+
+function sealAutoPreviewHtml(name) {
+  if (!name) return '<span class="hint">社名が未設定のため生成できません。</span>';
+  const chars = [...String(name)].length;
+  const grid = Math.ceil(Math.sqrt(chars));
+  const fontPx = Math.max(7, Math.floor(56 / grid));
+  return `<div class="seal-auto-preview"><div class="seal-auto-preview-text" style="font-size:${fontPx}px">${escHtml(name)}</div></div>`;
+}
+
+function renderSealAutoPreview() {
+  const box = document.getElementById('sealPreviewAuto');
+  if (!box) return;
+  box.innerHTML = sealAutoPreviewHtml(currentClient?.companyInfo?.name || '');
+}
+
+function renderSealImagePreview() {
+  const box = document.getElementById('sealPreviewImage');
+  if (!box) return;
+  const d = window._sealImageData || '';
+  box.innerHTML = d
+    ? `<img src="${d}" class="seal-img-preview"><div><button class="add-field-btn" style="width:auto;margin-top:8px;" onclick="clearSealImage()">画像を削除</button></div>`
+    : '<span class="hint">画像が未アップロードです。</span>';
+}
+
+function initSealPreviews() {
+  const checked = document.querySelector('input[name="sealMode"]:checked');
+  if (!checked) return;
+  if (checked.value === 'image') renderSealImagePreview();
+  else renderSealAutoPreview();
+}
+
+window.onSealEnabledChange = function() {
+  const on = document.getElementById('sealEnabled').checked;
+  document.getElementById('sealOptions').style.display = on ? '' : 'none';
+};
+
+window.onSealModeChange = function() {
+  const mode = document.querySelector('input[name="sealMode"]:checked')?.value || 'auto';
+  document.getElementById('sealAutoBox').style.display = mode === 'auto' ? '' : 'none';
+  document.getElementById('sealImageBox').style.display = mode === 'image' ? '' : 'none';
+  if (mode === 'auto') renderSealAutoPreview();
+  else renderSealImagePreview();
+};
+
+window.clearSealImage = function() {
+  window._sealImageData = '';
+  const f = document.getElementById('sealFile');
+  if (f) f.value = '';
+  renderSealImagePreview();
+};
+
+window.handleSealUpload = function(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const max = 300;
+      let w = img.width, h = img.height;
+      if (w >= h && w > max) { h = Math.round(h * max / w); w = max; }
+      else if (h > w && h > max) { w = Math.round(w * max / h); h = max; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      window._sealImageData = canvas.toDataURL('image/png');
+      renderSealImagePreview();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.saveSealInfo = async function() {
+  const c = currentClient?.companyInfo || {};
+  const enabled = document.getElementById('sealEnabled').checked;
+  const mode = document.querySelector('input[name="sealMode"]:checked')?.value || 'auto';
+  const imageData = mode === 'image' ? (window._sealImageData || '') : '';
+  const updated = { ...c, seal: { enabled, mode, imageData } };
+  try {
+    await setDoc(doc(db, 'clients', clientId), {
+      companyInfo: updated,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    currentClient.companyInfo = updated;
+    showToast('印鑑設定を保存しました。', 'success');
   } catch(e) {
     showToast('保存に失敗しました：' + e.message, 'error');
   }
