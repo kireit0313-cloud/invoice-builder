@@ -1695,7 +1695,7 @@ function sealAutoPreviewHtml(name) {
   const grid = Math.ceil(Math.sqrt(n));
   let cell = 15;
   let box = grid * cell + 12;
-  if (box > 100) { box = 100; cell = Math.max(6, Math.floor((box - 12) / grid)); }
+  if (box > 80) { box = 80; cell = Math.max(6, Math.floor((box - 12) / grid)); }
   if (box < 44) { box = 44; }
   return `<div class="seal-auto-preview" style="width:${box}px;height:${box}px"><div class="seal-auto-preview-text" style="font-size:${cell}px">${escHtml(name)}</div></div>`;
 }
