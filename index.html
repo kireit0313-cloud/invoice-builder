@@ -288,34 +288,9 @@ body {
       <input type="text" id="companyName" class="client-input"
         style="margin-bottom:10px;">
 
-      <label style="font-size:12px;color:var(--ink-soft);">住所</label>
-      <input type="text" id="companyAddress" class="client-input"
-        style="margin-bottom:10px;">
-
-      <label style="font-size:12px;color:var(--ink-soft);">電話番号</label>
-      <input type="text" id="companyTel" class="client-input"
-        style="margin-bottom:10px;">
-
-      <label style="font-size:12px;color:var(--ink-soft);">インボイス登録番号</label>
-      <input type="text" id="invoiceNumber" class="client-input"
-        style="margin-bottom:10px;">
-
-      <div id="bankInfoArea">
-        <label style="font-size:12px;color:var(--ink-soft);">振込先（銀行名・支店名・口座種別・口座番号・名義など）</label>
-        <textarea id="bankInfo" class="client-input" rows="3"
-          style="resize:vertical;font-family:'Noto Sans JP',sans-serif;"></textarea>
-      </div>
-
-      <label style="font-size:12px;color:var(--ink-soft);display:block;margin-top:14px;">
-        会社情報に関する追加項目（業種に応じて自由に追加できます）
-      </label>
-      <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px;">
-        建設業許可番号や保有資格など、自社に関する情報用です。PDFの会社情報欄にまとめて表示されます。
+      <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;">
+        住所・電話番号・登録番号・振込先・追加項目などは、納品前に各クライアントのURL（クライアント画面）の「会社情報の編集」「振込先の編集」で入力・保存してください。並び順もそちらで自由に設定できます。この画面では会社名のみ設定します。
       </p>
-      <div id="customFieldsArea"></div>
-      <button type="button" class="upload-btn" id="addCustomFieldBtn"
-        style="margin-top:6px;">＋ 項目を追加</button>
-
       <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">
         この情報はクライアントごとに保存され、PDF出力時に自動で差し込まれます。クライアントが変更したり目にすることはありません。
       </p>
@@ -572,25 +547,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const defaultTaxRateInput = document.getElementById('defaultTaxRate').value;
   const defaultTaxRate = defaultTaxRateInput === '' ? 10 : (parseInt(defaultTaxRateInput) || 0);
 
-  // 会社情報（固定情報）
-  const customFields = [];
-  document.querySelectorAll('#customFieldsArea .custom-field-row').forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const label = inputs[0].value.trim();
-    const value = inputs[1].value.trim();
-    if (label && value) {
-      customFields.push({ label, value });
-    }
-  });
-
-  const companyInfo = {
-    name: document.getElementById('companyName').value.trim(),
-    address: document.getElementById('companyAddress').value.trim(),
-    tel: document.getElementById('companyTel').value.trim(),
-    invoiceNumber: document.getElementById('invoiceNumber').value.trim(),
-    bankInfo: document.getElementById('bankInfo').value.trim(),
-    customFields: customFields,
-  };
+  // 会社情報：この画面では会社名のみ設定。その他（住所・TEL・登録番号・振込先・追加項目）は
+  // クライアント画面で入力するため、既存のcompanyInfoを保持し会社名だけ更新する（下のtry内で構築）。
+  const companyNameValue = document.getElementById('companyName').value.trim();
 
   try {
     const saveBtn = document.getElementById('saveBtn');
@@ -604,6 +563,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const createdAt = existingSnap.exists() && existingSnap.data().createdAt
       ? existingSnap.data().createdAt
       : serverTimestamp();
+
+    // 既存の会社情報（住所・振込先・fields・追加項目など）は保持し、会社名のみ更新する。
+    // これによりクライアント画面で設定した内容がこの画面の保存で消えるのを防ぐ。
+    const existingCompany = (existingSnap.exists() && existingSnap.data().companyInfo)
+      ? existingSnap.data().companyInfo : {};
+    const companyInfo = { ...existingCompany, name: companyNameValue };
 
     await setDoc(doc(db, 'clients', clientId), {
       clientName: clientName,
@@ -856,17 +821,9 @@ window.editClient = async function(clientId) {
     document.getElementById('defaultTaxRate').value =
       (d.defaultTaxRate !== undefined && d.defaultTaxRate !== null) ? d.defaultTaxRate : 10;
 
-    // 会社情報
+    // 会社情報（この画面では会社名のみ。その他はクライアント画面で編集）
     const company = d.companyInfo || {};
     document.getElementById('companyName').value = company.name || '';
-    document.getElementById('companyAddress').value = company.address || '';
-    document.getElementById('companyTel').value = company.tel || '';
-    document.getElementById('invoiceNumber').value = company.invoiceNumber || '';
-    document.getElementById('bankInfo').value = company.bankInfo || '';
-
-    // 会社情報に関する追加項目
-    document.getElementById('customFieldsArea').innerHTML = '';
-    (company.customFields || []).forEach(f => addCustomFieldRow(f.label, f.value));
 
     // 列設定（Excel再アップロード不要で復元）
     if (d.columns && d.columns.length > 0) {
@@ -879,25 +836,6 @@ window.editClient = async function(clientId) {
   }
 };
 
-// ========== その他記載事項（自由追加項目） ==========
-
-function addCustomFieldRow(label = '', value = '') {
-  const area = document.getElementById('customFieldsArea');
-  const row = document.createElement('div');
-  row.className = 'custom-field-row';
-  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
-  row.innerHTML = `
-    <input type="text" class="client-input"
-      style="flex:1;margin-bottom:0;" value="${label.replace(/"/g, '&quot;')}">
-    <input type="text" class="client-input"
-      style="flex:1.5;margin-bottom:0;" value="${value.replace(/"/g, '&quot;')}">
-    <button type="button" class="delete-field-btn">×</button>
-  `;
-  row.querySelector('.delete-field-btn').addEventListener('click', () => row.remove());
-  area.appendChild(row);
-}
-
-document.getElementById('addCustomFieldBtn').addEventListener('click', () => addCustomFieldRow());
 </script>
 
 </body>
