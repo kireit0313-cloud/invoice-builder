@@ -387,6 +387,21 @@ body {
   }
   /* スマホのみ改行させる <br class="br-sp"> */
   .br-sp { display: inline; }
+  /* 一括操作バー：スマホ幅で縦積み・ボタン全幅にして崩れを防ぐ */
+  .bulk-actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  .bulk-actions-bar .bulk-progress {
+    text-align: center;
+    order: -1;
+  }
+  .bulk-actions-bar #bulkSaveBtn,
+  .bulk-actions-bar .bulk-export-btn {
+    width: 100%;
+    text-align: center;
+  }
 }
 .add-field-btn {
   padding: 7px 14px;
@@ -460,10 +475,11 @@ body {
   /* ===== 一括編集モード ===== */
 .bulk-edit-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid #CBD5E0;
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
 }
 .bulk-edit-header {
   display: flex;
@@ -471,8 +487,8 @@ body {
   justify-content: space-between;
   padding: 12px 16px;
   cursor: pointer;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  background: #E8EEF5;
+  border-bottom: 1px solid #CBD5E0;
   user-select: none;
 }
 .bulk-edit-header:hover { background: #EFF6FF; }
@@ -490,7 +506,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   z-index: 10;
 }
 .bulk-progress { font-size: 13px; color: var(--ink-soft); }
@@ -1197,8 +1214,7 @@ window.openBulkEditMode = function() {
     card.innerHTML = `
       <div class="bulk-edit-header" onclick="toggleBulkCard('${bodyId}', this)">
         <div class="bulk-edit-header-left">
-          <span class="bulk-edit-partner-name">${escHtml(p.partnerName || '（名前なし）')}</span>
-          <span style="font-size:12px;color:var(--ink-soft);">${(p.lineItems||[]).length}行</span>
+          <span class="bulk-edit-partner-name">${escHtml(p.partnerName || '（名前なし）')} ${escHtml(p.honorific || '御中')}</span>
         </div>
         <span class="bulk-edit-toggle">▲ 折りたたむ</span>
       </div>
