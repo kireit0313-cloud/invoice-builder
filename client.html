@@ -443,13 +443,13 @@ body {
 .seal-mode-row { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--ink); }
 .seal-mode-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .seal-auto-preview {
-  width: 72px; height: 72px; border: 2px solid #C0392B; border-radius: 3px;
-  padding: 4px; display: flex; align-items: flex-start; justify-content: center;
+  border: 2px solid #C0392B; border-radius: 3px;
+  padding: 4px; display: flex; align-items: stretch; justify-content: center;
   overflow: hidden; background: #fff;
 }
 .seal-auto-preview-text {
-  writing-mode: vertical-rl; text-orientation: upright; color: #C0392B;
-  font-weight: bold; font-family: serif; line-height: 1.0; max-height: 100%;
+  writing-mode: vertical-rl; text-orientation: upright; text-align: start; color: #C0392B;
+  font-weight: bold; font-family: serif; line-height: 1.0; height: 100%;
 }
 .seal-img-preview { max-width: 72px; max-height: 72px; object-fit: contain; border: 1px solid var(--border); background: #fff; }
 .company-save-btn {
@@ -1690,10 +1690,14 @@ function buildSealEditHTML() {
 
 function sealAutoPreviewHtml(name) {
   if (!name) return '<span class="hint">社名が未設定のため生成できません。</span>';
-  const chars = [...String(name)].length;
-  const grid = Math.ceil(Math.sqrt(chars));
-  const fontPx = Math.max(7, Math.floor(56 / grid));
-  return `<div class="seal-auto-preview"><div class="seal-auto-preview-text" style="font-size:${fontPx}px">${escHtml(name)}</div></div>`;
+  // PDF側（index.js）と同じ計算式：文字数に応じて枠を自動拡大
+  const n = [...String(name)].length;
+  const grid = Math.ceil(Math.sqrt(n));
+  let cell = 15;
+  let box = grid * cell + 12;
+  if (box > 100) { box = 100; cell = Math.max(6, Math.floor((box - 12) / grid)); }
+  if (box < 44) { box = 44; }
+  return `<div class="seal-auto-preview" style="width:${box}px;height:${box}px"><div class="seal-auto-preview-text" style="font-size:${cell}px">${escHtml(name)}</div></div>`;
 }
 
 function renderSealAutoPreview() {
