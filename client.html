@@ -358,6 +358,19 @@ body {
     width: 100%;
     flex: 1 1 100%;
   }
+  /* 自由項目記入欄（上段）：項目名を上段・内容＋×を下段に */
+  #freeFieldsArea .free-field-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #freeFieldsArea .free-field-label {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  #freeFieldsArea .free-field-value {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 .add-field-btn {
   padding: 7px 14px;
