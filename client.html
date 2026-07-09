@@ -28,16 +28,21 @@ body {
   flex-direction: column;
 }
 .header {
+  position: relative;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 1rem 1.5rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 1rem;
 }
-.header-left { display: flex; align-items: center; gap: 1rem; }
+.header-left { display: flex; align-items: center; gap: 1rem; text-align: center; }
 .back-btn {
+  position: absolute;
+  left: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -89,7 +94,7 @@ body {
 .partner-item:hover { border-color: var(--accent); }
 .partner-item.checked { border-color: var(--accent); background: #EFF6FF; }
 .partner-checkbox { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
-.partner-info { flex: 1; text-align: center; }
+.partner-info { flex: 1; }
 .partner-name { font-size: 14px; font-weight: 500; color: var(--ink); }
 .partner-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 .partner-delete-btn {
@@ -315,6 +320,18 @@ body {
   padding: 4px;
 }
 .free-field-del:hover { color: var(--danger); }
+.field-move-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 6px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.field-move-btn:hover { border-color: var(--accent); color: var(--accent); }
 .add-field-btn {
   padding: 7px 14px;
   background: none;
@@ -433,6 +450,67 @@ body {
 }
 .bulk-export-btn:hover { opacity: 0.85; }
 .bulk-export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== カスタムポップアップ（確認ダイアログ） ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-box {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+.modal-msg {
+  font-size: 14px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  cursor: pointer;
+}
+.modal-btn-cancel { background: var(--bg); color: var(--ink); border: 1px solid var(--border); }
+.modal-btn-ok { background: var(--accent); color: #fff; }
+.modal-btn-danger { background: var(--danger); color: #fff; }
+.modal-btn:hover { opacity: 0.85; }
+
+/* ===== トースト通知 ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 90%;
+  z-index: 1100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.toast.show { opacity: 1; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
 </style>
 </head>
 <body>
@@ -631,14 +709,15 @@ window.deletePartnerById = async function(el) {
   if (!id) return;
   const partner = partners.find(p => p.id === id);
   const name = partner ? (partner.partnerName || '') : '';
-  if (!confirm(`「${name}」を削除しますか？\nこの取引先のデータはすべて削除されます。`)) return;
+  const ok = await showConfirm(`「${name}」を削除しますか？\nこの取引先のデータはすべて削除されます。`, { okText: '削除する', danger: true });
+  if (!ok) return;
   try {
     await deleteDoc(doc(db, 'clients', clientId, 'partners', id));
     checkedIds.delete(id);
     partners = partners.filter(p => p.id !== id);
     renderPartnerList();
   } catch(e) {
-    alert('削除に失敗しました：' + e.message);
+    showToast('削除に失敗しました：' + e.message, 'error');
   }
 };
 
@@ -648,7 +727,7 @@ window.addPartner = async function() {
   const name = nameInput.value.trim();
   const honorific = document.getElementById('newPartnerHonorific').value;
   const issueDay = document.getElementById('newPartnerIssueDay').value;
-  if (!name) { alert('取引先名を入力してください。'); return; }
+  if (!name) { showToast('取引先名を入力してください。', 'error'); return; }
   try {
     const ref = await addDoc(collection(db, 'clients', clientId, 'partners'), {
       partnerName: name,
@@ -665,7 +744,7 @@ window.addPartner = async function() {
     const newPartner = partners.find(p => p.id === ref.id);
     if (newPartner) { currentPartner = newPartner; currentPartnerId = ref.id; showDetailScreen(newPartner, false); }
   } catch(e) {
-    alert('追加に失敗しました：' + e.message);
+    showToast('追加に失敗しました：' + e.message, 'error');
   }
 };
 
@@ -954,7 +1033,7 @@ window.savePartnerData = async function() {
     btn.textContent = '保存しました ✓';
     setTimeout(() => { btn.textContent = '内容保存'; btn.disabled = false; }, 2000);
   } catch(e) {
-    alert('保存に失敗しました：' + e.message);
+    showToast('保存に失敗しました：' + e.message, 'error');
     btn.textContent = '内容保存';
     btn.disabled = false;
   }
@@ -996,7 +1075,7 @@ window.exportPDF = async function() {
     currentPartner.remarksLower = remarksLower;
 
   } catch(e) {
-    alert('PDF生成に失敗しました：' + e.message);
+    showToast('PDF生成に失敗しました：' + e.message, 'error');
   } finally {
     btn.textContent = 'PDF出力';
     btn.disabled = false;
@@ -1033,7 +1112,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate, honorific,
 // =====================
 window.openBulkEditMode = function() {
   const targets = partners.filter(p => checkedIds.has(p.id));
-  if (targets.length === 0) { alert('取引先を選択してください。'); return; }
+  if (targets.length === 0) { showToast('取引先を選択してください。', 'error'); return; }
 
   document.getElementById('backBtn').style.display = 'inline-block';
   document.getElementById('headerSub').textContent = '一括編集モード（' + targets.length + '件）';
@@ -1240,7 +1319,7 @@ window.bulkSaveAll = async function() {
     btn.textContent = '保存しました ✓';
     setTimeout(() => { btn.textContent = '全件内容保存'; btn.disabled = false; }, 2000);
   } catch(e) {
-    alert('保存に失敗しました：' + e.message);
+    showToast('保存に失敗しました：' + e.message, 'error');
     btn.textContent = '全件内容保存';
     btn.disabled = false;
   }
@@ -1340,7 +1419,7 @@ window.bulkEditExport = async function() {
     setTimeout(() => showPartnerList(), 1500);
 
   } catch(e) {
-    alert('一括PDF出力に失敗しました：' + e.message);
+    showToast('一括PDF出力に失敗しました：' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = '一括出力（PDF＋Excel）ZIP';
@@ -1352,11 +1431,13 @@ window.bulkEditExport = async function() {
 // =====================
 function buildCompanyEditHTML() {
   const c = currentClient?.companyInfo || {};
-  const customFields = (c.customFields || []).map((f, i) => `
-    <div class="free-field-row" id="cff_${i}">
+  const customFields = (c.customFields || []).map((f) => `
+    <div class="free-field-row">
+      <button type="button" class="field-move-btn" title="上へ移動" onclick="moveCompanyField(this,-1)">▲</button>
+      <button type="button" class="field-move-btn" title="下へ移動" onclick="moveCompanyField(this,1)">▼</button>
       <input type="text" class="free-field-label" value="${escHtml(f.label||'')}" placeholder="項目名" autocomplete="off">
       <input type="text" class="free-field-value" value="${escHtml(f.value||'')}" placeholder="内容" autocomplete="off">
-      <button class="free-field-del" onclick="document.getElementById('cff_${i}').remove()">×</button>
+      <button class="free-field-del" title="削除" onclick="this.closest('.free-field-row').remove()">×</button>
     </div>
   `).join('');
 
@@ -1381,7 +1462,11 @@ function buildCompanyEditHTML() {
     </div>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:12px;margin-bottom:8px;">追加項目</p>
     <div class="free-fields" id="companyCustomFields">${customFields}</div>
-    <button class="add-field-btn" onclick="addCompanyCustomField()">＋ 追加項目を追加</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+      <button class="add-field-btn" style="width:auto;flex:1;min-width:140px;margin-top:0;" onclick="addCompanyCustomField()">＋ 追加項目を追加</button>
+      <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('FAX')">＋FAX</button>
+      <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('E-mail')">＋E-mail</button>
+    </div>
     <br>
     <button class="company-save-btn" onclick="saveCompanyInfo()">会社情報を保存</button>
   `;
@@ -1410,25 +1495,38 @@ window.saveBankInfo = async function() {
       updatedAt: serverTimestamp(),
     }, { merge: true });
     currentClient.companyInfo = updated;
-    alert('振込先を保存しました。');
+    showToast('振込先を保存しました。', 'success');
   } catch(e) {
-    alert('保存に失敗しました：' + e.message);
+    showToast('保存に失敗しました：' + e.message, 'error');
   }
 };
 
-window.addCompanyCustomField = function() {
+window.addCompanyCustomField = function(label, value) {
   const area = document.getElementById('companyCustomFields');
   if (!area) return;
-  const idx = area.children.length;
   const div = document.createElement('div');
   div.className = 'free-field-row';
-  div.id = 'cff_new_' + idx;
   div.innerHTML = `
-    <input type="text" class="free-field-label" placeholder="項目名" autocomplete="off">
-    <input type="text" class="free-field-value" placeholder="内容" autocomplete="off">
-    <button class="free-field-del" onclick="this.parentElement.remove()">×</button>
+    <button type="button" class="field-move-btn" title="上へ移動" onclick="moveCompanyField(this,-1)">▲</button>
+    <button type="button" class="field-move-btn" title="下へ移動" onclick="moveCompanyField(this,1)">▼</button>
+    <input type="text" class="free-field-label" value="${escHtml(label||'')}" placeholder="項目名" autocomplete="off">
+    <input type="text" class="free-field-value" value="${escHtml(value||'')}" placeholder="内容" autocomplete="off">
+    <button class="free-field-del" title="削除" onclick="this.closest('.free-field-row').remove()">×</button>
   `;
   area.appendChild(div);
+  // プリセット（項目名入り）の場合は内容欄へフォーカス
+  if (label) { const v = div.querySelector('.free-field-value'); if (v) v.focus(); }
+};
+
+// 追加項目の並び替え（dir=-1で上へ, 1で下へ）。DOM順がそのまま保存順・PDF表示順になる
+window.moveCompanyField = function(btn, dir) {
+  const row = btn.closest('.free-field-row');
+  if (!row) return;
+  if (dir < 0 && row.previousElementSibling) {
+    row.parentElement.insertBefore(row, row.previousElementSibling);
+  } else if (dir > 0 && row.nextElementSibling) {
+    row.parentElement.insertBefore(row.nextElementSibling, row);
+  }
 };
 
 window.saveCompanyInfo = async function() {
@@ -1453,9 +1551,9 @@ window.saveCompanyInfo = async function() {
       updatedAt: serverTimestamp(),
     }, { merge: true });
     currentClient.companyInfo = updated;
-    alert('会社情報を保存しました。');
+    showToast('会社情報を保存しました。', 'success');
   } catch(e) {
-    alert('保存に失敗しました：' + e.message);
+    showToast('保存に失敗しました：' + e.message, 'error');
   }
 };
 
@@ -1558,6 +1656,45 @@ function formatDate(d) {
 }
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// カスタムトースト通知（ブラウザ標準alertの置き換え。ドメイン名が出ない）
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 250);
+  }, 2800);
+}
+
+// カスタム確認ダイアログ（ブラウザ標準confirmの置き換え。ドメイン名が出ない）
+function showConfirm(msg, opts) {
+  opts = opts || {};
+  const okText = opts.okText || 'OK';
+  const danger = !!opts.danger;
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-msg"></div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel">キャンセル</button>
+          <button class="modal-btn ${danger ? 'modal-btn-danger' : 'modal-btn-ok'}">${escHtml(okText)}</button>
+        </div>
+      </div>`;
+    overlay.querySelector('.modal-msg').textContent = msg;
+    document.body.appendChild(overlay);
+    const btns = overlay.querySelectorAll('.modal-btn');
+    const close = (val) => { overlay.remove(); resolve(val); };
+    btns[0].onclick = () => close(false);
+    btns[1].onclick = () => close(true);
+    overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+  });
 }
 function showError(msg) {
   document.getElementById('headerTitle').textContent = 'エラー';
