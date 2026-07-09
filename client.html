@@ -334,6 +334,9 @@ body {
 }
 .field-move-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* スマホ専用改行：既定（PC）では改行しない（モバイル時のみ @media で表示） */
+.br-sp { display: none; }
+
 /* 会社情報編集：スマホ幅で項目名・内容を縦積みにする（▲▼と×は上段） */
 @media (max-width: 480px) {
   #companyCustomFields .free-field-row {
@@ -371,6 +374,19 @@ body {
     flex: 1 1 auto;
     min-width: 0;
   }
+  /* ヘッダー：戻るボタンと取引先名の重なりを解消（縦積み） */
+  .header-left {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .back-btn {
+    position: static;
+    transform: none;
+    align-self: flex-start;
+  }
+  /* スマホのみ改行させる <br class="br-sp"> */
+  .br-sp { display: inline; }
 }
 .add-field-btn {
   padding: 7px 14px;
@@ -855,16 +871,16 @@ function showDetailScreen(partner, imported) {
     <!-- 自由記入欄（下段） -->
     <div class="card">
       <p class="card-title">自由記入欄（下段）</p>
-      <p class="hint" style="margin-top:-6px;">備考など。未記入の場合はPDFに表示されません。</p>
+      <p class="hint" style="margin-top:-6px;">備考など。<br class="br-sp">未記入の場合はPDFに表示されません。</p>
       <textarea id="remarksLowerInput" class="free-fields"
         style="width:100%;min-height:70px;resize:vertical;font-family:inherit;font-size:14px;padding:8px;box-sizing:border-box;"></textarea>
     </div>
 
     <!-- アクション -->
     <div class="actions">
-      <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容保存</button>
-      <button class="btn" id="excelBtn" onclick="exportExcel()" style="background:#1D6F42;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">Excel出力</button>
-      <button class="btn" id="pdfBtn" onclick="exportPDF()" style="background:#D32F2F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">PDF出力</button>
+      <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容<br class="br-sp">保存</button>
+      <button class="btn" id="excelBtn" onclick="exportExcel()" style="background:#1D6F42;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">Excel<br class="br-sp">出力</button>
+      <button class="btn" id="pdfBtn" onclick="exportPDF()" style="background:#D32F2F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">PDF<br class="br-sp">出力</button>
     </div>
   `;
 
@@ -906,7 +922,7 @@ window.addFreeField = function(label, value) {
   div.className = 'free-field-row';
   div.id = id;
   div.innerHTML = `
-    <input type="text" class="free-field-label" placeholder="項目名" value="${escHtml(label)}" autocomplete="off">
+    <input type="text" class="free-field-label" placeholder="項目名（空欄可）" value="${escHtml(label)}" autocomplete="off">
     <input type="text" class="free-field-value" placeholder="内容" value="${escHtml(value)}" autocomplete="off">
     <button class="free-field-del" onclick="document.getElementById('${id}').remove()">×</button>
   `;
@@ -1072,10 +1088,10 @@ window.savePartnerData = async function() {
     currentPartner.issueDate  = issueDate;
     currentPartner.remarksLower = remarksLower;
     btn.textContent = '保存しました ✓';
-    setTimeout(() => { btn.textContent = '内容保存'; btn.disabled = false; }, 2000);
+    setTimeout(() => { btn.innerHTML = '内容<br class="br-sp">保存'; btn.disabled = false; }, 2000);
   } catch(e) {
     showToast('保存に失敗しました：' + e.message, 'error');
-    btn.textContent = '内容保存';
+    btn.innerHTML = '内容<br class="br-sp">保存';
     btn.disabled = false;
   }
 };
@@ -1118,7 +1134,7 @@ window.exportPDF = async function() {
   } catch(e) {
     showToast('PDF生成に失敗しました：' + e.message, 'error');
   } finally {
-    btn.textContent = 'PDF出力';
+    btn.innerHTML = 'PDF<br class="br-sp">出力';
     btn.disabled = false;
   }
 };
