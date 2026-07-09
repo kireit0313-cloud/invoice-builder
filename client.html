@@ -1690,14 +1690,15 @@ function buildSealEditHTML() {
 
 function sealAutoPreviewHtml(name) {
   if (!name) return '<span class="hint">社名が未設定のため生成できません。</span>';
-  // PDF側（index.js）と同じ計算式：文字数に応じて枠を自動拡大
+  // PDF側（index.js）と同じ計算式：文字数に応じて枠を自動拡大し、フォントはマス目より小さくして余白確保
   const n = [...String(name)].length;
   const grid = Math.ceil(Math.sqrt(n));
-  let cell = 15;
-  let box = grid * cell + 12;
-  if (box > 80) { box = 80; cell = Math.max(6, Math.floor((box - 12) / grid)); }
-  if (box < 44) { box = 44; }
-  return `<div class="seal-auto-preview" style="width:${box}px;height:${box}px"><div class="seal-auto-preview-text" style="font-size:${cell}px">${escHtml(name)}</div></div>`;
+  let box = grid * 18 + 12;
+  if (box > 80) box = 80;
+  if (box < 44) box = 44;
+  const inner = box - 12;
+  const font = Math.max(6, Math.min(15, Math.floor(inner / grid) - 3));
+  return `<div class="seal-auto-preview" style="width:${box}px;height:${box}px"><div class="seal-auto-preview-text" style="font-size:${font}px">${escHtml(name)}</div></div>`;
 }
 
 function renderSealAutoPreview() {
