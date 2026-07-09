@@ -237,16 +237,17 @@ body {
 .add-row-btn {
   margin-top: 1rem;
   padding: 8px 16px;
-  background: none;
-  border: 1px dashed var(--border);
+  background: #EFF6FF;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  color: var(--ink-soft);
+  color: var(--accent);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
   font-family: 'Noto Sans JP', sans-serif;
   width: 100%;
 }
-.add-row-btn:hover { border-color: var(--accent); color: var(--accent); }
+.add-row-btn:hover { background: var(--accent); color: #fff; }
 
 /* 合計エリア */
 .totals {
@@ -360,17 +361,18 @@ body {
 }
 .add-field-btn {
   padding: 7px 14px;
-  background: none;
-  border: 1px dashed var(--border);
+  background: #EFF6FF;
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  color: var(--ink-soft);
+  color: var(--accent);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
   font-family: 'Noto Sans JP', sans-serif;
   width: 100%;
   margin-top: 4px;
 }
-.add-field-btn:hover { border-color: var(--accent); color: var(--accent); }
+.add-field-btn:hover { background: var(--accent); color: #fff; }
 
 /* 会社情報編集 */
 .company-edit-grid {
@@ -781,7 +783,7 @@ window.addPartner = async function() {
 // =====================
 function showDetailScreen(partner, imported) {
   document.getElementById('backBtn').style.display = 'inline-block';
-  document.getElementById('headerTitle').textContent = partner.partnerName;
+  document.getElementById('headerTitle').textContent = partner.partnerName + ' ' + (partner.honorific || '御中');
   document.getElementById('headerSub').textContent = '請求書入力';
 
   rowCount = 0;
@@ -811,7 +813,7 @@ function showDetailScreen(partner, imported) {
     <div class="card">
       <p class="card-title">
         明細を入力
-        ${imported ? '<span class="badge-imported">先月データをインポート済み</span>' : ''}
+        ${imported ? '<span class="badge-imported">前回データをインポート済み</span>' : ''}
       </p>
       <div class="table-scroll">
         <table class="items-table">
@@ -831,7 +833,7 @@ function showDetailScreen(partner, imported) {
         </table>
       </div>
       <p class="hint">
-        作業日は「6/2」や「6/2〜6/4」など自由に入力できます。数量と単価を入れると金額が自動計算されます。税率は10・8・0ボタンで即入力、それ以外は直接入力できます。
+        日付は「6/2」や「6/2〜6/4」など自由に入力できます。数量と単価を入れると金額が自動計算されます。税率は10・8・0ボタンで即入力、それ以外は直接入力できます。
       </p>
       <button class="add-row-btn" onclick="addRow()">＋ 行を追加</button>
       <div class="totals" id="totalsArea"></div>
@@ -891,7 +893,7 @@ window.addFreeField = function(label, value) {
   div.className = 'free-field-row';
   div.id = id;
   div.innerHTML = `
-    <input type="text" class="free-field-label" placeholder="項目名（例：施工場所）" value="${escHtml(label)}" autocomplete="off">
+    <input type="text" class="free-field-label" placeholder="項目名" value="${escHtml(label)}" autocomplete="off">
     <input type="text" class="free-field-value" placeholder="内容" value="${escHtml(value)}" autocomplete="off">
     <button class="free-field-del" onclick="document.getElementById('${id}').remove()">×</button>
   `;
@@ -926,10 +928,10 @@ window.addRow = function(item) {
 
   tr.innerHTML = `
     <td class="col-date">
-      <input type="text" value="${escHtml(String(dateVal))}" placeholder="例：6/2 や 6/2〜6/4" autocomplete="off">
+      <input type="text" value="${escHtml(String(dateVal))}" placeholder="" autocomplete="off">
     </td>
     <td class="col-service">
-      <input type="text" value="${escHtml(String(svcVal))}" placeholder="例：エアコン洗浄" autocomplete="off">
+      <input type="text" value="${escHtml(String(svcVal))}" placeholder="" autocomplete="off">
     </td>
     <td class="col-qty">
       <input type="number" value="${qtyVal}" placeholder="" min="0" autocomplete="off"
