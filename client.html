@@ -1429,43 +1429,55 @@ window.bulkEditExport = async function() {
 // =====================
 //  会社情報編集
 // =====================
-function buildCompanyEditHTML() {
+// 会社情報の項目リストを取得（新形式fields優先、無ければ旧形式から自動変換）
+function getCompanyFields() {
   const c = currentClient?.companyInfo || {};
-  const customFields = (c.customFields || []).map((f) => `
+  if (Array.isArray(c.fields)) return c.fields;
+  // レガシー移行：住所（見出しなし）→TEL→登録番号→追加項目 の順（従来の表示を維持）
+  const legacy = [];
+  if (c.address)       legacy.push({ label: '',       value: c.address });
+  if (c.tel)           legacy.push({ label: 'TEL',    value: c.tel });
+  if (c.invoiceNumber) legacy.push({ label: '登録番号', value: c.invoiceNumber });
+  (c.customFields || []).forEach(f => {
+    if (f && (f.label || f.value)) legacy.push({ label: f.label || '', value: f.value || '' });
+  });
+  return legacy;
+}
+
+// 会社情報の1項目行のHTML
+function companyFieldRowHTML(label, value) {
+  return `
     <div class="free-field-row">
       <button type="button" class="field-move-btn" title="上へ移動" onclick="moveCompanyField(this,-1)">▲</button>
       <button type="button" class="field-move-btn" title="下へ移動" onclick="moveCompanyField(this,1)">▼</button>
-      <input type="text" class="free-field-label" value="${escHtml(f.label||'')}" placeholder="項目名" autocomplete="off">
-      <input type="text" class="free-field-value" value="${escHtml(f.value||'')}" placeholder="内容" autocomplete="off">
+      <input type="text" class="free-field-label" value="${escHtml(label||'')}" placeholder="項目名（空欄可）" autocomplete="off">
+      <input type="text" class="free-field-value" value="${escHtml(value||'')}" placeholder="内容" autocomplete="off">
       <button class="free-field-del" title="削除" onclick="this.closest('.free-field-row').remove()">×</button>
-    </div>
-  `).join('');
+    </div>`;
+}
+
+function buildCompanyEditHTML() {
+  const c = currentClient?.companyInfo || {};
+  const rows = getCompanyFields().map(f => companyFieldRowHTML(f.label, f.value)).join('');
 
   return `
     <div class="company-edit-grid">
-      <div>
+      <div class="company-edit-full">
         <label>社名（変更不可）</label>
         <input type="text" value="${escHtml(c.name||'')}" readonly>
       </div>
-      <div>
-        <label>TEL</label>
-        <input type="text" id="cTel" value="${escHtml(c.tel||'')}" autocomplete="off">
-      </div>
-      <div class="company-edit-full">
-        <label>住所</label>
-        <input type="text" id="cAddress" value="${escHtml(c.address||'')}" autocomplete="off">
-      </div>
-      <div>
-        <label>インボイス登録番号</label>
-        <input type="text" id="cInvoiceNumber" value="${escHtml(c.invoiceNumber||'')}" autocomplete="off">
-      </div>
     </div>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:12px;margin-bottom:8px;">追加項目</p>
-    <div class="free-fields" id="companyCustomFields">${customFields}</div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:12px;margin-bottom:8px;">
+      会社情報の項目（▲▼で並び替え。この順番でPDFに表示されます。項目名を空欄にすると見出しなしで表示されます）
+    </p>
+    <div class="free-fields" id="companyCustomFields">${rows}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-      <button class="add-field-btn" style="width:auto;flex:1;min-width:140px;margin-top:0;" onclick="addCompanyCustomField()">＋ 追加項目を追加</button>
+      <button class="add-field-btn" style="width:auto;flex:1;min-width:140px;margin-top:0;" onclick="addCompanyCustomField()">＋ 項目を追加</button>
+      <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('住所')">＋住所</button>
+      <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('TEL')">＋TEL</button>
       <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('FAX')">＋FAX</button>
       <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('E-mail')">＋E-mail</button>
+      <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('登録番号')">＋登録番号</button>
     </div>
     <br>
     <button class="company-save-btn" onclick="saveCompanyInfo()">会社情報を保存</button>
@@ -1504,15 +1516,9 @@ window.saveBankInfo = async function() {
 window.addCompanyCustomField = function(label, value) {
   const area = document.getElementById('companyCustomFields');
   if (!area) return;
-  const div = document.createElement('div');
-  div.className = 'free-field-row';
-  div.innerHTML = `
-    <button type="button" class="field-move-btn" title="上へ移動" onclick="moveCompanyField(this,-1)">▲</button>
-    <button type="button" class="field-move-btn" title="下へ移動" onclick="moveCompanyField(this,1)">▼</button>
-    <input type="text" class="free-field-label" value="${escHtml(label||'')}" placeholder="項目名" autocomplete="off">
-    <input type="text" class="free-field-value" value="${escHtml(value||'')}" placeholder="内容" autocomplete="off">
-    <button class="free-field-del" title="削除" onclick="this.closest('.free-field-row').remove()">×</button>
-  `;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = companyFieldRowHTML(label, value).trim();
+  const div = tmp.firstElementChild;
   area.appendChild(div);
   // プリセット（項目名入り）の場合は内容欄へフォーカス
   if (label) { const v = div.querySelector('.free-field-value'); if (v) v.focus(); }
@@ -1531,19 +1537,14 @@ window.moveCompanyField = function(btn, dir) {
 
 window.saveCompanyInfo = async function() {
   const c = currentClient?.companyInfo || {};
-  const customRows = document.querySelectorAll('#companyCustomFields .free-field-row');
-  const customFields = [...customRows].map(row => {
+  const rows = document.querySelectorAll('#companyCustomFields .free-field-row');
+  const fields = [...rows].map(row => {
     const inputs = row.querySelectorAll('input');
-    return { label: inputs[0].value, value: inputs[1].value };
-  }).filter(f => f.label || f.value);
+    return { label: inputs[0].value.trim(), value: inputs[1].value };
+  }).filter(f => f.label || (f.value && f.value.trim()));
 
-  const updated = {
-    ...c,
-    tel:           document.getElementById('cTel')?.value || '',
-    address:       document.getElementById('cAddress')?.value || '',
-    invoiceNumber: document.getElementById('cInvoiceNumber')?.value || '',
-    customFields,
-  };
+  // 新形式fieldsを保存。旧フィールドは今後index.jsが参照しないため残っても無害
+  const updated = { ...c, fields };
 
   try {
     await setDoc(doc(db, 'clients', clientId), {
