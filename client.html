@@ -768,7 +768,7 @@ function renderPartnerList() {
 
     <!-- PDFの配色（会社カラー）編集 -->
     <div class="card">
-      <p class="card-title">PDFの配色（会社カラー）</p>
+      <p class="card-title">PDFの配色（カラー）</p>
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">タイトル・見出し・合計欄などにアクセントカラーを適用します。グレーを選ぶと標準の配色になります。</p>
       ${buildThemeEditHTML()}
     </div>
@@ -1830,7 +1830,7 @@ function buildThemeEditHTML() {
   return `
     <div class="theme-mode-row">
       <label><input type="radio" name="themeMode" value="gray" ${mode==='gray'?'checked':''} onchange="onThemeModeChange()"> グレー（標準）</label>
-      <label><input type="radio" name="themeMode" value="color" ${mode==='color'?'checked':''} onchange="onThemeModeChange()"> 会社カラー</label>
+      <label><input type="radio" name="themeMode" value="color" ${mode==='color'?'checked':''} onchange="onThemeModeChange()"> カラー選択</label>
     </div>
     <div id="themeColorOptions" style="${mode==='color'?'':'display:none;'}margin-top:12px;">
       <div class="theme-swatches">${swatches}</div>
