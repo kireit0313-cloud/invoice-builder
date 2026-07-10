@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>請求書入力</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -955,7 +954,9 @@ function showDetailScreen(partner, imported) {
     <!-- アクション -->
     <div class="actions">
       <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容<br class="br-sp">保存</button>
-      <button class="btn" id="excelBtn" onclick="exportExcel()" style="background:#1D6F42;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">Excel<br class="br-sp">出力</button>
+      <button class="btn" id="backupBtn" onclick="exportBackup()" style="background:#1D6F42;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">バックアップ<br class="br-sp">書き出し</button>
+      <button class="btn" id="restoreBtn" onclick="triggerRestore()" style="background:#4A5568;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">復元<br class="br-sp">読み込み</button>
+      <input type="file" id="restorePartnerFileInput" accept=".json,application/json" style="display:none" onchange="handleRestoreFile(event)">
       <button class="btn" id="pdfBtn" onclick="exportPDF()" style="background:#D32F2F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">PDF<br class="br-sp">出力</button>
     </div>
   `;
@@ -1266,7 +1267,7 @@ window.openBulkEditMode = function() {
     <div class="bulk-actions-bar">
       <span class="bulk-progress" id="bulkEditProgress">${targets.length}件のPDFをまとめて出力します</span>
       <button class="btn btn-secondary" id="bulkSaveBtn" onclick="bulkSaveAll()" style="padding:10px 20px;">全件内容保存</button>
-      <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">一括出力（PDF＋Excel）ZIP</button>
+      <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">一括出力（PDF）ZIP</button>
     </div>
   `;
 
@@ -1505,45 +1506,6 @@ window.bulkEditExport = async function() {
         const buf  = await blob.arrayBuffer();
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
-        // Excel生成してZIPに追加
-        const L = getColumnLabels();
-        const xlsData = [[L[0], L[1], L[2], L[3], L[4], '税率（%）', L[5]]];
-        items.forEach(it => {
-          xlsData.push([
-            it.date, it.service,
-            it.qty   == null ? '' : it.qty,
-            it.price == null ? '' : it.price,
-            it.amount,
-            it.taxRate,
-            it.remark,
-          ]);
-        });
-        xlsData.push([]);
-        // 税率ごと合計
-        const taxMap = {};
-        items.forEach(it => {
-          const r = it.taxRate || 0;
-          taxMap[r] = (taxMap[r] || 0) + (it.amount || 0);
-        });
-        let grandTotal = 0;
-        Object.entries(taxMap).sort((a,b)=>b[0]-a[0]).forEach(([rate, subtotal]) => {
-          const r = parseInt(rate);
-          const tax = r > 0 ? Math.floor(subtotal*(r/100)) : 0;
-          grandTotal += subtotal + tax;
-          if (r > 0) {
-            xlsData.push(['','','','','', `${r}%対象小計`, '¥'+subtotal.toLocaleString()]);
-            xlsData.push(['','','','','', `消費税（${r}%）`, '¥'+tax.toLocaleString()]);
-          } else {
-            xlsData.push(['','','','','', '対象外・税込小計', '¥'+subtotal.toLocaleString()]);
-          }
-        });
-        xlsData.push(['','','','','','合計','¥'+grandTotal.toLocaleString()]);
-        const ws = XLSX.utils.aoa_to_sheet(xlsData);
-        ws['!cols'] = [{wch:14},{wch:24},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '明細');
-        const xlsBuf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        zip.file(`${docLabel}_${p.partnerName}_${today}.xlsx`, xlsBuf);
         // Firestoreへ保存（先月データ更新）
         await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
           partnerName: p.partnerName,
@@ -1575,7 +1537,7 @@ window.bulkEditExport = async function() {
     showToast('一括PDF出力に失敗しました：' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = '一括出力（PDF＋Excel）ZIP';
+    btn.textContent = '一括出力（PDF）ZIP';
   }
 };
 
@@ -1945,43 +1907,76 @@ window.saveThemeInfo = async function() {
 };
 
 // =====================
-//  Excel出力
+//  バックアップ書き出し／復元（取引先単位・JSON）
 // =====================
-window.exportExcel = function() {
-  const name = currentPartner?.partnerName || 'document';
-  const L = getColumnLabels();
-  const data = [[L[0], L[1], L[2], L[3], L[4], '税率（%）', L[5]]];
-  const rows = document.querySelectorAll('#itemsBody tr');
-  rows.forEach(row => {
-    const f = rowInputs(row);
-    data.push([
-      f.date.value, f.service.value,
-      f.qty.value==='' ? '' : parseFloat(f.qty.value)||0,
-      f.price.value==='' ? '' : parseFloat(f.price.value)||0,
-      parseFloat(f.amount.value)||0,
-      f.taxRate.value==='' ? 0 : parseInt(f.taxRate.value)||0,
-      f.remark.value,
-    ]);
-  });
-  data.push([]);
-  const groups = buildTaxGroups();
-  let grandTotal = 0;
-  groups.forEach(([rate, subtotal]) => {
-    const tax = rate > 0 ? Math.floor(subtotal*(rate/100)) : 0;
-    grandTotal += subtotal + tax;
-    if (rate > 0) {
-      data.push(['','','','','', `${rate}%対象小計`, '¥'+subtotal.toLocaleString()]);
-      data.push(['','','','','', `消費税（${rate}%）`, '¥'+tax.toLocaleString()]);
-    } else {
-      data.push(['','','','','', '対象外・税込小計', '¥'+subtotal.toLocaleString()]);
-    }
-  });
-  data.push(['','','','','','合計','¥'+grandTotal.toLocaleString()]);
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:14},{wch:24},{wch:8},{wch:12},{wch:12},{wch:10},{wch:20}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '明細');
-  XLSX.writeFile(wb, `請求書_${name}_${todayStr().replace(/-/g,'')}.xlsx`);
+// PDFは「請求書」、このJSONは「過去データの保管・復元用」。役割を分離している。
+// 画面に表示中の内容をそのまま書き出す（＝見えている状態のバックアップ）。
+window.exportBackup = function() {
+  if (!currentPartner) return;
+  const backup = {
+    _type: 'invoice-builder-partner-backup',
+    _version: 1,
+    exportedAt: new Date().toISOString(),
+    clientId: clientId,
+    partnerId: currentPartnerId,
+    partner: {
+      partnerName:  currentPartner.partnerName || '',
+      honorific:    currentPartner.honorific || '御中',
+      issueDay:     currentPartner.issueDay || '末日',
+      issueDate:    getIssueDate(),
+      invoiceNo:    document.getElementById('invoiceNoInput')?.value.trim() || '',
+      lineItems:    getLineItems(),
+      freeFields:   getFreeFields(),
+      remarksLower: document.getElementById('remarksLowerInput')?.value.trim() || '',
+    },
+  };
+  const name = currentPartner.partnerName || 'partner';
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `バックアップ_${name}_${todayStr().replace(/-/g,'')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('バックアップを書き出しました。', 'success');
+};
+
+window.triggerRestore = function() {
+  const input = document.getElementById('restorePartnerFileInput');
+  if (input) { input.value = ''; input.click(); }
+};
+
+window.handleRestoreFile = async function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (e) {
+    showToast('ファイルを読み込めませんでした（JSON形式ではありません）。', 'error');
+    return;
+  }
+  if (!data || data._type !== 'invoice-builder-partner-backup' || !data.partner) {
+    showToast('この取引先のバックアップファイルではありません。', 'error');
+    return;
+  }
+  const bp = data.partner;
+  const fromName = bp.partnerName || '（名前なし）';
+  const ok = await showConfirm(
+    `バックアップ「${fromName}」の内容で、いま開いている取引先を上書きします。\n（明細・自由項目・備考・請求書番号・発行日を差し替え。保存するまではFirestoreに反映されません）\nよろしいですか？`,
+    { okText: '復元する' }
+  );
+  if (!ok) return;
+
+  // 現在の取引先（識別情報）は保持し、請求書の中身だけ差し替える
+  currentPartner.lineItems   = Array.isArray(bp.lineItems) ? bp.lineItems : [];
+  currentPartner.freeFields  = Array.isArray(bp.freeFields) ? bp.freeFields : [];
+  currentPartner.remarksLower = bp.remarksLower || '';
+  currentPartner.invoiceNo   = bp.invoiceNo || '';
+  if (bp.issueDate) currentPartner.issueDate = bp.issueDate;
+
+  showDetailScreen(currentPartner, true);
+  showToast('復元しました。内容を確認して「内容保存」または「PDF出力」してください。', 'success');
 };
 
 // =====================
