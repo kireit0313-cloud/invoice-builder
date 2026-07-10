@@ -296,6 +296,10 @@ body {
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+/* 保存＝主要アクション（目立たせる）、PDF＝出力（赤）、バックアップ/復元＝控えめなアウトライン */
+.btn-save { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(59,130,246,0.35); }
+.btn-pdf { background: #D32F2F; color: #fff; }
+.btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--border); }
 .btn:hover { opacity: 0.85; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -953,11 +957,11 @@ function showDetailScreen(partner, imported) {
 
     <!-- アクション -->
     <div class="actions">
-      <button class="btn btn-secondary" id="saveBtn" onclick="savePartnerData()">内容<br class="br-sp">保存</button>
-      <button class="btn" id="backupBtn" onclick="exportBackup()" style="background:#1D6F42;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">バックアップ<br class="br-sp">書き出し</button>
-      <button class="btn" id="restoreBtn" onclick="triggerRestore()" style="background:#4A5568;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">復元<br class="br-sp">読み込み</button>
+      <button class="btn btn-outline" id="backupBtn" onclick="exportBackup()">バックアップ<br class="br-sp">書き出し</button>
+      <button class="btn btn-outline" id="restoreBtn" onclick="triggerRestore()">復元<br class="br-sp">読み込み</button>
       <input type="file" id="restorePartnerFileInput" accept=".json,application/json" style="display:none" onchange="handleRestoreFile(event)">
-      <button class="btn" id="pdfBtn" onclick="exportPDF()" style="background:#D32F2F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:15px;cursor:pointer;">PDF<br class="br-sp">出力</button>
+      <button class="btn btn-save" id="saveBtn" onclick="savePartnerData()">内容<br class="br-sp">保存</button>
+      <button class="btn btn-pdf" id="pdfBtn" onclick="exportPDF()">PDF<br class="br-sp">出力</button>
     </div>
   `;
 
@@ -1962,10 +1966,19 @@ window.handleRestoreFile = async function(event) {
   }
   const bp = data.partner;
   const fromName = bp.partnerName || '（名前なし）';
-  const ok = await showConfirm(
-    `バックアップ「${fromName}」の内容で、いま開いている取引先を上書きします。\n（明細・自由項目・備考・請求書番号・発行日を差し替え。保存するまではFirestoreに反映されません）\nよろしいですか？`,
-    { okText: '復元する' }
-  );
+  const curName = currentPartner?.partnerName || '（名前なし）';
+  const mismatch = fromName !== curName;
+
+  let msg, okText;
+  if (mismatch) {
+    // 取引先名が違う＝ファイルの取り違えの可能性。強めに警告する。
+    msg = `⚠️ 取引先名が一致しません。\n・バックアップ：${fromName}\n・いま開いている取引先：${curName}\n\n別の取引先の内容で上書きしようとしています。ファイルを間違えていないか確認してください。\n\n復元しても、この時点では画面に反映されるだけです。「内容保存」ボタンを押すまで確定しません。\nそれでも復元しますか？`;
+    okText = 'それでも復元する';
+  } else {
+    msg = `バックアップ「${fromName}」の内容で、いま開いている取引先の明細・自由項目・備考・請求書番号・発行日を差し替えます。\n\nこの時点では画面に反映されるだけです。「内容保存」ボタンを押すまで確定しません。\nよろしいですか？`;
+    okText = '復元する';
+  }
+  const ok = await showConfirm(msg, { okText, danger: mismatch });
   if (!ok) return;
 
   // 現在の取引先（識別情報）は保持し、請求書の中身だけ差し替える
