@@ -1293,6 +1293,11 @@ window.openBulkEditMode = function() {
           <span style="font-size:14px;font-weight:bold;">${p.issueDate || calcIssueDate(p.issueDay || '末日')}</span>
           <span style="font-size:12px;color:var(--ink-soft);">（締め日：${p.issueDay && p.issueDay !== '手入力' ? p.issueDay + '日' : p.issueDay || '末日'}）</span>
         </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 0 8px;">
+          <span style="font-size:13px;color:var(--ink);min-width:70px;">請求書番号</span>
+          <input type="text" id="beinv_${p.id}" value="${escHtml(p.invoiceNo || '')}" placeholder="任意（例：2026-0710-001）" autocomplete="off"
+            style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:220px;">
+        </div>
         <div class="table-scroll">
           <table class="items-table">
             <thead>
@@ -1448,6 +1453,7 @@ window.bulkSaveAll = async function() {
       const tableId = 'betbl_' + p.id;
       const items = bulkGetLineItems(tableId);
       const issueDate = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
       await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
         partnerName: p.partnerName,
         issueDay:    p.issueDay || '末日',
@@ -1455,8 +1461,10 @@ window.bulkSaveAll = async function() {
         lineItems:   items,
         freeFields:  p.freeFields || [],
         remarksLower: p.remarksLower || '',
+        invoiceNo:   invoiceNo,
         updatedAt:   serverTimestamp(),
       }, { merge: true });
+      p.invoiceNo = invoiceNo;
     }
     btn.textContent = '保存しました ✓';
     setTimeout(() => { btn.textContent = '全件内容保存'; btn.disabled = false; }, 2000);
@@ -1490,9 +1498,10 @@ window.bulkEditExport = async function() {
       const freeFields = p.freeFields || [];
       const remarksLower = p.remarksLower || '';
       const issueDateBulk = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
 
       try {
-        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific, remarksLower, p.invoiceNo || '');
+        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific, remarksLower, invoiceNo);
         const buf  = await blob.arrayBuffer();
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
@@ -1541,8 +1550,10 @@ window.bulkEditExport = async function() {
           lineItems:   items,
           freeFields:  freeFields,
           remarksLower: remarksLower,
+          invoiceNo:   invoiceNo,
           updatedAt:   serverTimestamp(),
         }, { merge: true });
+        p.invoiceNo = invoiceNo;
 
       } catch(e) {
         console.warn(`${p.partnerName} のPDF生成失敗:`, e.message);
