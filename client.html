@@ -888,9 +888,9 @@ function showDetailScreen(partner, imported) {
   rowCount = 0;
   const body = document.getElementById('mainBody');
   body.innerHTML = `
-    <!-- 発行日 -->
+    <!-- 発行日・請求書番号 -->
     <div class="card">
-      <p class="card-title">発行日</p>
+      <p class="card-title">発行日・請求書番号</p>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span id="issueDateDisplay" style="font-size:15px;font-weight:bold;"></span>
         <span id="issueDayLabel" style="font-size:13px;color:var(--ink-soft);"></span>
@@ -898,6 +898,12 @@ function showDetailScreen(partner, imported) {
         <input type="text" id="issueDateCustom" placeholder="例：2026年7月31日"
           style="display:none;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:200px;"
           oninput="updateIssueDateDisplay()">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        <label for="invoiceNoInput" style="font-size:13px;color:var(--ink-soft);min-width:84px;">請求書番号</label>
+        <input type="text" id="invoiceNoInput" placeholder="任意（例：2026-0710-001）" autocomplete="off"
+          style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:220px;">
+        <span style="font-size:12px;color:var(--ink-soft);">空欄ならPDFに表示されません（請求日の上に表示）</span>
       </div>
     </div>
 
@@ -962,6 +968,9 @@ function showDetailScreen(partner, imported) {
 
   // 自由記入欄（下段）の初期表示
   document.getElementById('remarksLowerInput').value = partner.remarksLower || '';
+
+  // 請求書番号の初期表示（保存済みがあれば復元。前月値を引き継ぐ運用）
+  document.getElementById('invoiceNoInput').value = partner.invoiceNo || '';
 
   // 明細の初期描画（先月データがあればインポート、なければ空行1行）
   if (partner.lineItems && partner.lineItems.length > 0) {
@@ -1145,18 +1154,21 @@ window.savePartnerData = async function() {
     const freeFields = getFreeFields();
     const issueDate  = getIssueDate();
     const remarksLower = document.getElementById('remarksLowerInput').value.trim();
+    const invoiceNo  = document.getElementById('invoiceNoInput').value.trim();
     await setDoc(doc(db, 'clients', clientId, 'partners', currentPartnerId), {
       partnerName: currentPartner.partnerName,
       issueDate:   issueDate,
       lineItems:   items,
       freeFields:  freeFields,
       remarksLower: remarksLower,
+      invoiceNo:   invoiceNo,
       updatedAt:   serverTimestamp(),
     }, { merge: true });
     currentPartner.lineItems  = items;
     currentPartner.freeFields = freeFields;
     currentPartner.issueDate  = issueDate;
     currentPartner.remarksLower = remarksLower;
+    currentPartner.invoiceNo  = invoiceNo;
     btn.textContent = '保存しました ✓';
     setTimeout(() => { btn.innerHTML = '内容<br class="br-sp">保存'; btn.disabled = false; }, 2000);
   } catch(e) {
@@ -1178,7 +1190,8 @@ window.exportPDF = async function() {
     const freeFields = getFreeFields();
     const issueDate  = getIssueDate();
     const remarksLower = document.getElementById('remarksLowerInput').value.trim();
-    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate, currentPartner.honorific, remarksLower);
+    const invoiceNo  = document.getElementById('invoiceNoInput').value.trim();
+    const blob = await generatePDF(currentPartner.partnerName, items, freeFields, issueDate, currentPartner.honorific, remarksLower, invoiceNo);
 
     // ダウンロード
     const url = URL.createObjectURL(blob);
@@ -1194,12 +1207,14 @@ window.exportPDF = async function() {
       lineItems:   items,
       freeFields:  freeFields,
       remarksLower: remarksLower,
+      invoiceNo:   invoiceNo,
       updatedAt:   serverTimestamp(),
     }, { merge: true });
 
     currentPartner.lineItems  = items;
     currentPartner.freeFields = freeFields;
     currentPartner.remarksLower = remarksLower;
+    currentPartner.invoiceNo  = invoiceNo;
 
   } catch(e) {
     showToast('PDF生成に失敗しました：' + e.message, 'error');
@@ -1210,7 +1225,7 @@ window.exportPDF = async function() {
 };
 
 // PDF生成（Cloud Run）
-async function generatePDF(partnerName, items, freeFields, issueDate, honorific, remarksLower) {
+async function generatePDF(partnerName, items, freeFields, issueDate, honorific, remarksLower, invoiceNo) {
   const payload = {
     clientName:   partnerName,
     items,
@@ -1221,6 +1236,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate, honorific,
     issueDate:    issueDate || calcIssueDate('末日'),
     honorific:    honorific || '御中',
     columnLabels: getColumnLabels(),
+    invoiceNo:    invoiceNo || '',
   };
   const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
     method: 'POST',
@@ -1476,7 +1492,7 @@ window.bulkEditExport = async function() {
       const issueDateBulk = p.issueDate || calcIssueDate(p.issueDay || '末日');
 
       try {
-        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific, remarksLower);
+        const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific, remarksLower, p.invoiceNo || '');
         const buf  = await blob.arrayBuffer();
         zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
 
