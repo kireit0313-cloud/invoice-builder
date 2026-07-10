@@ -77,6 +77,19 @@ body {
   color: var(--ink);
   margin-bottom: 1rem;
 }
+.common-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 999px;
+  padding: 2px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 
 /* ===== 取引先一覧 ===== */
 .partner-list { display: flex; flex-direction: column; gap: 8px; }
@@ -748,27 +761,27 @@ function renderPartnerList() {
 
     <!-- 会社情報編集 -->
     <div class="card">
-      <p class="card-title">会社情報の編集</p>
+      <p class="card-title">会社情報の編集<span class="common-badge">共通項目</span></p>
       ${buildCompanyEditHTML()}
     </div>
 
     <!-- 振込先編集 -->
     <div class="card">
-      <p class="card-title">振込先の編集</p>
+      <p class="card-title">振込先の編集<span class="common-badge">共通項目</span></p>
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">PDFでは会社情報とは別の場所に表示されます。</p>
       ${buildBankEditHTML()}
     </div>
 
     <!-- 印鑑（角印）編集 -->
     <div class="card">
-      <p class="card-title">印鑑（角印）</p>
+      <p class="card-title">印鑑（角印）<span class="common-badge">共通項目</span></p>
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">請求書PDFの会社情報の下に表示されます。</p>
       ${buildSealEditHTML()}
     </div>
 
     <!-- PDFの配色（会社カラー）編集 -->
     <div class="card">
-      <p class="card-title">PDFの配色（カラー）</p>
+      <p class="card-title">PDFの配色（カラー）<span class="common-badge">共通項目</span></p>
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">タイトル・見出し・合計欄などにアクセントカラーを適用します。グレーを選ぶと標準の配色になります。</p>
       ${buildThemeEditHTML()}
     </div>
