@@ -452,6 +452,16 @@ body {
   font-weight: bold; font-family: serif; line-height: 1.0; height: 100%;
 }
 .seal-img-preview { max-width: 72px; max-height: 72px; object-fit: contain; border: 1px solid var(--border); background: #fff; }
+.theme-mode-row { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--ink); }
+.theme-mode-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.theme-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.theme-swatch { width: 30px; height: 30px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; outline: 1px solid var(--border); }
+.theme-swatch.active { border-color: var(--ink); }
+.theme-color-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.theme-color-row input[type="color"] { width: 44px; height: 34px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
+.theme-hex-input { width: 120px; }
+.theme-preview-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.theme-preview-box { width: 22px; height: 22px; border-radius: 4px; outline: 1px solid var(--border); }
 .company-save-btn {
   margin-top: 12px;
   padding: 9px 20px;
@@ -755,9 +765,17 @@ function renderPartnerList() {
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">請求書PDFの会社情報の下に表示されます。</p>
       ${buildSealEditHTML()}
     </div>
+
+    <!-- PDFの配色（会社カラー）編集 -->
+    <div class="card">
+      <p class="card-title">PDFの配色（会社カラー）</p>
+      <p class="hint" style="margin-top:-6px;margin-bottom:12px;">タイトル・見出し・合計欄などにアクセントカラーを適用します。グレーを選ぶと標準の配色になります。</p>
+      ${buildThemeEditHTML()}
+    </div>
   `;
   updateBulkBar();
   initSealPreviews();
+  initThemePreview();
 }
 
 // チェック状態管理
@@ -1778,6 +1796,109 @@ window.saveSealInfo = async function() {
     }, { merge: true });
     currentClient.companyInfo = updated;
     showToast('印鑑設定を保存しました。', 'success');
+  } catch(e) {
+    showToast('保存に失敗しました：' + e.message, 'error');
+  }
+};
+
+// =====================
+//  PDFの配色（会社カラー）設定
+// =====================
+// theme = { mode:'gray'|'color', color:'#hex' }。クライアント単位でcompanyInfoに保存。
+// PDF側(index.js)がこのthemeを受け取り、グレー/カラーで配色を切り替える。
+const THEME_PRESETS = [
+  { name: 'ネイビー',   hex: '#185FA5' },
+  { name: 'グリーン',   hex: '#0F6E56' },
+  { name: 'レンガ',     hex: '#993C1D' },
+  { name: 'パープル',   hex: '#5B4B8A' },
+  { name: 'チャコール', hex: '#444441' },
+];
+function normalizeHex(v) {
+  let s = String(v || '').trim();
+  if (s && s[0] !== '#') s = '#' + s;
+  if (/^#[0-9a-fA-F]{3}$/.test(s)) s = '#' + s.slice(1).split('').map(c => c + c).join('');
+  return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toUpperCase() : null;
+}
+function buildThemeEditHTML() {
+  const c = currentClient?.companyInfo || {};
+  const theme = c.theme || {};
+  const mode = theme.mode === 'color' ? 'color' : 'gray';
+  const color = normalizeHex(theme.color) || '#185FA5';
+  const swatches = THEME_PRESETS.map(p =>
+    `<button type="button" class="theme-swatch${color.toUpperCase() === p.hex.toUpperCase() ? ' active' : ''}" style="background:${p.hex}" title="${p.name}" onclick="setThemePreset('${p.hex}')"></button>`
+  ).join('');
+  return `
+    <div class="theme-mode-row">
+      <label><input type="radio" name="themeMode" value="gray" ${mode==='gray'?'checked':''} onchange="onThemeModeChange()"> グレー（標準）</label>
+      <label><input type="radio" name="themeMode" value="color" ${mode==='color'?'checked':''} onchange="onThemeModeChange()"> 会社カラー</label>
+    </div>
+    <div id="themeColorOptions" style="${mode==='color'?'':'display:none;'}margin-top:12px;">
+      <div class="theme-swatches">${swatches}</div>
+      <div class="theme-color-row">
+        <input type="color" id="cThemeColor" value="${color}" onchange="onThemePickerChange()" oninput="onThemePickerChange()">
+        <input type="text" id="cThemeHex" class="theme-hex-input" value="${color}" placeholder="#185FA5" autocomplete="off" onchange="onThemeHexChange()">
+        <span class="theme-preview-chip"><span class="theme-preview-box" id="themePreviewBox" style="background:${color}"></span>プレビュー</span>
+      </div>
+    </div>
+    <button class="company-save-btn" onclick="saveThemeInfo()">配色を保存</button>
+  `;
+}
+function initThemePreview() {
+  updateThemePreviewChip();
+}
+function markActiveSwatch(hex) {
+  const up = (hex || '').toUpperCase();
+  document.querySelectorAll('.theme-swatch').forEach((b, i) => {
+    b.classList.toggle('active', (THEME_PRESETS[i].hex.toUpperCase() === up));
+  });
+}
+function updateThemePreviewChip() {
+  const box = document.getElementById('themePreviewBox');
+  const hex = normalizeHex(document.getElementById('cThemeHex')?.value) || '#185FA5';
+  if (box) box.style.background = hex;
+}
+window.onThemeModeChange = function() {
+  const mode = document.querySelector('input[name="themeMode"]:checked')?.value || 'gray';
+  const opt = document.getElementById('themeColorOptions');
+  if (opt) opt.style.display = mode === 'color' ? '' : 'none';
+};
+window.setThemePreset = function(hex) {
+  const picker = document.getElementById('cThemeColor');
+  const hexIn = document.getElementById('cThemeHex');
+  if (picker) picker.value = hex;
+  if (hexIn) hexIn.value = hex;
+  markActiveSwatch(hex);
+  updateThemePreviewChip();
+};
+window.onThemePickerChange = function() {
+  const picker = document.getElementById('cThemeColor');
+  const hexIn = document.getElementById('cThemeHex');
+  if (picker && hexIn) hexIn.value = picker.value.toUpperCase();
+  markActiveSwatch(picker?.value);
+  updateThemePreviewChip();
+};
+window.onThemeHexChange = function() {
+  const hexIn = document.getElementById('cThemeHex');
+  const norm = normalizeHex(hexIn?.value);
+  if (!norm) { showToast('カラーコードは #RRGGBB 形式で入力してください。', 'error'); return; }
+  hexIn.value = norm;
+  const picker = document.getElementById('cThemeColor');
+  if (picker) picker.value = norm;
+  markActiveSwatch(norm);
+  updateThemePreviewChip();
+};
+window.saveThemeInfo = async function() {
+  const c = currentClient?.companyInfo || {};
+  const mode = document.querySelector('input[name="themeMode"]:checked')?.value === 'color' ? 'color' : 'gray';
+  const color = normalizeHex(document.getElementById('cThemeHex')?.value) || '#185FA5';
+  const updated = { ...c, theme: { mode, color } };
+  try {
+    await setDoc(doc(db, 'clients', clientId), {
+      companyInfo: updated,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    currentClient.companyInfo = updated;
+    showToast('配色を保存しました。', 'success');
   } catch(e) {
     showToast('保存に失敗しました：' + e.message, 'error');
   }
