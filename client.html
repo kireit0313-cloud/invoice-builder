@@ -296,10 +296,10 @@ body {
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
-/* 保存＝主要アクション（目立たせる）、PDF＝出力（赤）、バックアップ/復元＝控えめなアウトライン */
+/* 保存＝主要アクション（目立たせる）、PDF＝出力（赤）、バックアップ/復元＝アウトライン。全ボタンに影を付与（案B）。 */
 .btn-save { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(59,130,246,0.35); }
-.btn-pdf { background: #D32F2F; color: #fff; }
-.btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--border); }
+.btn-pdf { background: #D32F2F; color: #fff; box-shadow: 0 2px 6px rgba(211,47,47,0.3); }
+.btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--border); box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
 .btn:hover { opacity: 0.85; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1271,6 +1271,7 @@ window.openBulkEditMode = function() {
     <div class="bulk-actions-bar">
       <span class="bulk-progress" id="bulkEditProgress">${targets.length}件のPDFをまとめて出力します</span>
       <button class="btn btn-secondary" id="bulkSaveBtn" onclick="bulkSaveAll()" style="padding:10px 20px;">全件内容保存</button>
+      <button class="btn btn-secondary" id="bulkBackupBtn" onclick="bulkBackupExport()" style="padding:10px 20px;">一括バックアップ（ZIP）</button>
       <button class="bulk-export-btn" id="bulkEditExportBtn" onclick="bulkEditExport()">一括出力（PDF）ZIP</button>
     </div>
   `;
@@ -1477,6 +1478,51 @@ window.bulkSaveAll = async function() {
     showToast('保存に失敗しました：' + e.message, 'error');
     btn.textContent = '全件内容保存';
     btn.disabled = false;
+  }
+};
+
+window.bulkBackupExport = async function() {
+  const targets = window._bulkEditTargets || [];
+  if (targets.length === 0) return;
+  const btn = document.getElementById('bulkBackupBtn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '書き出し中...'; }
+  try {
+    const zip = new JSZip();
+    const today = todayStr().replace(/-/g, '');
+    for (const p of targets) {
+      const items = bulkGetLineItems('betbl_' + p.id);
+      const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
+      const issueDate = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      const backup = {
+        _type: 'invoice-builder-partner-backup', _version: 1,
+        exportedAt: new Date().toISOString(),
+        clientId: clientId, partnerId: p.id,
+        partner: {
+          partnerName:  p.partnerName || '',
+          honorific:    p.honorific || '御中',
+          issueDay:     p.issueDay || '末日',
+          issueDate:    issueDate,
+          invoiceNo:    invoiceNo,
+          lineItems:    items,
+          freeFields:   p.freeFields || [],
+          remarksLower: p.remarksLower || '',
+        },
+      };
+      zip.file(`バックアップ_${p.partnerName || 'partner'}_${today}.json`, JSON.stringify(backup, null, 2));
+    }
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `バックアップ_一括_${today}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`${targets.length}件のバックアップを書き出しました。`, 'success');
+  } catch (e) {
+    showToast('バックアップに失敗しました：' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
 };
 
