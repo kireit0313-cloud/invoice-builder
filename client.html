@@ -1788,7 +1788,7 @@ function sealAutoPreviewHtml(name) {
   const n = chars.length;
   const cols = Math.ceil(Math.sqrt(n));
   const maxRows = Math.ceil(n / cols);
-  const box = 80;           // 角印サイズは固定（文字数によらず一定）
+  const box = 68;           // 角印サイズは固定（文字数によらず一定）
   const inner = box - 12;
   const cellH = inner / maxRows; // 1文字セルの高さ（固定）＝上そろえの基準
   const fs = (Math.min(inner / cols, cellH) * 0.94).toFixed(1);
