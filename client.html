@@ -869,6 +869,13 @@ window.addPartner = async function() {
   const honorific = document.getElementById('newPartnerHonorific').value;
   const issueDay = document.getElementById('newPartnerIssueDay').value;
   if (!name) { showToast('取引先名を入力してください。', 'error'); return; }
+  // 取引先の登録上限：既定50件。クライアント文書に maxPartners（数値）があればそれを優先。
+  // ※ここはUI上のガード。数値の変更は管理者がFirebaseコンソールで client 文書の maxPartners を設定する。
+  const maxPartners = Number(currentClient?.maxPartners) > 0 ? Number(currentClient.maxPartners) : 50;
+  if (Array.isArray(partners) && partners.length >= maxPartners) {
+    showToast(`取引先の登録上限（${maxPartners}件）に達しています。不要な取引先を削除してから追加してください。`, 'error');
+    return;
+  }
   try {
     const ref = await addDoc(collection(db, 'clients', clientId, 'partners'), {
       partnerName: name,
