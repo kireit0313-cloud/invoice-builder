@@ -947,11 +947,11 @@ function showDetailScreen(partner, imported) {
             <tr>
               <th class="col-date">${getColumnLabels()[0]}</th>
               <th class="col-service">${getColumnLabels()[1]}</th>
-              <th class="col-qty">${getColumnLabels()[2]}</th>
-              <th class="col-price">${getColumnLabels()[3]}</th>
+              <th class="col-qty"${colHideStyle('qty')}>${getColumnLabels()[2]}</th>
+              <th class="col-price"${colHideStyle('price')}>${getColumnLabels()[3]}</th>
               <th class="col-amount">${getColumnLabels()[4]}</th>
               <th class="col-tax">税率（%）</th>
-              <th class="col-remark">${getColumnLabels()[5]}</th>
+              <th class="col-remark"${colHideStyle('remark')}>${getColumnLabels()[5]}</th>
               <th class="col-delete"></th>
             </tr>
           </thead>
@@ -1064,11 +1064,11 @@ window.addRow = function(item) {
     <td class="col-service">
       <input type="text" value="${escHtml(String(svcVal))}" placeholder="" autocomplete="off">
     </td>
-    <td class="col-qty">
+    <td class="col-qty"${colHideStyle('qty')}>
       <input type="number" value="${qtyVal}" placeholder="" min="0" autocomplete="off"
         oninput="calcRow('${id}')">
     </td>
-    <td class="col-price">
+    <td class="col-price"${colHideStyle('price')}>
       <input type="number" value="${priceVal}" placeholder="" min="0" autocomplete="off"
         oninput="calcRow('${id}')">
     </td>
@@ -1085,7 +1085,7 @@ window.addRow = function(item) {
         <button type="button" onclick="setTaxRate('${id}', 0)">0%</button>
       </div>
     </td>
-    <td class="col-remark">
+    <td class="col-remark"${colHideStyle('remark')}>
       <input type="text" value="${escHtml(String(remVal))}" placeholder="" autocomplete="off">
     </td>
     <td class="col-delete">
@@ -1259,6 +1259,7 @@ async function generatePDF(partnerName, items, freeFields, issueDate, honorific,
     issueDate:    issueDate || calcIssueDate('末日'),
     honorific:    honorific || '御中',
     columnLabels: getColumnLabels(),
+    colFlags:     { qty: colEnabled('qty'), price: colEnabled('price'), remark: colEnabled('remark') },
     invoiceNo:    invoiceNo || '',
   };
   const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
@@ -1328,11 +1329,11 @@ window.openBulkEditMode = function() {
               <tr>
                 <th class="col-date">${getColumnLabels()[0]}</th>
                 <th class="col-service">${getColumnLabels()[1]}</th>
-                <th class="col-qty">${getColumnLabels()[2]}</th>
-                <th class="col-price">${getColumnLabels()[3]}</th>
+                <th class="col-qty"${colHideStyle('qty')}>${getColumnLabels()[2]}</th>
+                <th class="col-price"${colHideStyle('price')}>${getColumnLabels()[3]}</th>
                 <th class="col-amount">${getColumnLabels()[4]}</th>
                 <th class="col-tax">税率（%）</th>
-                <th class="col-remark">${getColumnLabels()[5]}</th>
+                <th class="col-remark"${colHideStyle('remark')}>${getColumnLabels()[5]}</th>
                 <th class="col-delete"></th>
               </tr>
             </thead>
@@ -1387,8 +1388,8 @@ window.bulkAddRow = function(tableId, item) {
   tr.innerHTML = `
     <td class="col-date"><input type="text" value="${escHtml(String(dateVal))}" placeholder="例：6/2" autocomplete="off"></td>
     <td class="col-service"><input type="text" value="${escHtml(String(svcVal))}" placeholder="サービス名" autocomplete="off"></td>
-    <td class="col-qty"><input type="number" value="${qtyVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
-    <td class="col-price"><input type="number" value="${priceVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
+    <td class="col-qty"${colHideStyle('qty')}><input type="number" value="${qtyVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
+    <td class="col-price"${colHideStyle('price')}><input type="number" value="${priceVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
     <td class="col-amount"><input type="number" value="${amtVal}" placeholder="0" min="0" autocomplete="off" oninput="bulkCalcTotals('${tableId}','${totalsId}')"></td>
     <td class="col-tax">
       <input type="number" value="${taxVal}" min="0" step="1" autocomplete="off" id="${rid}_tax" oninput="bulkCalcTotals('${tableId}','${totalsId}')">
@@ -1398,7 +1399,7 @@ window.bulkAddRow = function(tableId, item) {
         <button type="button" onclick="bulkSetTax('${rid}','${tableId}','${totalsId}',0)">0%</button>
       </div>
     </td>
-    <td class="col-remark"><input type="text" value="${escHtml(String(remVal))}" autocomplete="off"></td>
+    <td class="col-remark"${colHideStyle('remark')}><input type="text" value="${escHtml(String(remVal))}" autocomplete="off"></td>
     <td class="col-delete"><button class="delete-btn" onclick="bulkDeleteRow('${rid}','${tableId}','${totalsId}')">×</button></td>
   `;
   tbody.appendChild(tr);
@@ -2109,7 +2110,19 @@ function getColumnLabels() {
   const cols = currentClient?.columns;
   if (!cols || cols.length === 0) return defaults;
   return defaults.map((def, i) => (cols[i] && cols[i].name) ? cols[i].name : def);
-}  
+}
+// 列の表示ON/OFF判定（管理画面で設定）。オプション列＝数量(2)・単価(3)・備考(5)。
+// 未設定（旧データ）は全て表示扱いで互換維持。作業日・サービス名・金額・税率は常時表示。
+function colEnabled(key) {
+  const map = { qty: 2, price: 3, remark: 5 };
+  if (!(key in map)) return true;
+  const c = currentClient?.columns?.[map[key]];
+  return !c || c.enabled !== false;
+}
+// オフ列は display:none で隠す（入力値は保持して往復させるため要素自体は残す）
+function colHideStyle(key) {
+  return colEnabled(key) ? '' : ' style="display:none"';
+}
 function formatDate(d) {
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
 }
