@@ -2106,7 +2106,7 @@ function todayStr() { return new Date().toISOString().split('T')[0]; }
 // 列ラベル取得（Excelのcolumnsから、なければデフォルト）
 // 順序：作業日・サービス名・数量・単価・金額・備考（税率は固定・対象外）
 function getColumnLabels() {
-  const defaults = ['作業日','サービス名','数量','単価（円）','金額（円）','備考'];
+  const defaults = ['日付','内容','数量','単価（税抜）','金額（税抜）','備考'];
   const cols = currentClient?.columns;
   if (!cols || cols.length === 0) return defaults;
   return defaults.map((def, i) => (cols[i] && cols[i].name) ? cols[i].name : def);

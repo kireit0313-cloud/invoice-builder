@@ -14,6 +14,8 @@
   --ink: #1A202C;
   --ink-soft: #718096;
   --accent: #3B82F6;
+  --danger: #C0392B;
+  --success: #16A34A;
 }
 body {
   background: var(--bg);
@@ -203,6 +205,90 @@ body {
 .col-badge-opt input { vertical-align: -1px; margin-right: 2px; }
 .col-name-input.col-off { opacity: 0.4; }
 
+/* ===== カスタムポップアップ（確認ダイアログ・ドメイン名なし） ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: modalFade 0.15s ease;
+}
+@keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+.modal-box {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 1.6rem 1.5rem 1.35rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+  animation: modalPop 0.18s ease;
+}
+@keyframes modalPop { from { transform: translateY(8px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-title-icon {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #fff; flex: none;
+}
+.modal-title-icon.info { background: var(--accent); }
+.modal-title-icon.danger { background: var(--danger); }
+.modal-title-icon.success { background: var(--success); }
+.modal-msg {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  line-height: 1.7;
+  margin-bottom: 1.35rem;
+}
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Noto Sans JP', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.modal-btn-cancel { background: var(--bg); color: var(--ink); border: 1px solid var(--border); }
+.modal-btn-ok { background: var(--accent); color: #fff; }
+.modal-btn-danger { background: var(--danger); color: #fff; }
+.modal-btn:hover { opacity: 0.85; }
+
+/* ===== トースト通知 ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 90%;
+  z-index: 1100;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+
 /* クライアント一覧 */
 .client-list-table {
   width: 100%;
@@ -316,28 +402,28 @@ body {
     <div class="card">
       <p class="card-title">明細の項目名</p>
       <p style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">
-        クライアント画面の明細表に表示される見出しです。お客様に合わせて名称を変更できます。「数量」「単価」「備考」は使わない場合、チェックを外すと入力欄とPDFの両方から消え、残りの列が横幅いっぱいに広がります。作業日・サービス名・金額・税率は必須のため常に表示されます。
+        クライアント画面の明細表に表示される見出しです。お客様に合わせて名称を変更できます。「数量」「単価」「備考」は使わない場合、チェックを外すと入力欄とPDFの両方から消え、残りの列が横幅いっぱいに広がります。日付・内容・金額・税率は必須のため常に表示されます。
       </p>
       <div id="colRows">
         <div class="col-row">
           <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName0" class="client-input col-name-input" placeholder="作業日">
+          <input type="text" id="colName0" class="client-input col-name-input">
         </div>
         <div class="col-row">
           <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName1" class="client-input col-name-input" placeholder="サービス名">
+          <input type="text" id="colName1" class="client-input col-name-input">
         </div>
         <div class="col-row">
           <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn2" checked> 表示</label>
-          <input type="text" id="colName2" class="client-input col-name-input" placeholder="数量">
+          <input type="text" id="colName2" class="client-input col-name-input">
         </div>
         <div class="col-row">
           <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn3" checked> 表示</label>
-          <input type="text" id="colName3" class="client-input col-name-input" placeholder="単価（円）">
+          <input type="text" id="colName3" class="client-input col-name-input">
         </div>
         <div class="col-row">
           <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName4" class="client-input col-name-input" placeholder="金額（円）">
+          <input type="text" id="colName4" class="client-input col-name-input">
         </div>
         <div class="col-row">
           <span class="col-badge col-badge-fixed">固定</span>
@@ -345,7 +431,7 @@ body {
         </div>
         <div class="col-row">
           <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn5" checked> 表示</label>
-          <input type="text" id="colName5" class="client-input col-name-input" placeholder="備考">
+          <input type="text" id="colName5" class="client-input col-name-input">
         </div>
       </div>
     </div>
@@ -452,16 +538,63 @@ window.signOut = async () => {
   await fbSignOut(auth);
 };
 
+// ========== カスタムポップアップ（ブラウザ標準alert/confirmの置換。ドメイン名が出ない） ==========
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// トースト通知（type: '' | 'success' | 'error'）
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 250);
+  }, 2800);
+}
+// 確認ダイアログ（Promise<boolean>）。opts: { title, okText, danger }
+function showConfirm(msg, opts) {
+  opts = opts || {};
+  const title   = opts.title || '確認';
+  const okText  = opts.okText || 'OK';
+  const danger  = !!opts.danger;
+  const iconCls = danger ? 'danger' : 'info';
+  const icon    = danger ? '!' : '?';
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-title"><span class="modal-title-icon ${iconCls}">${icon}</span><span class="modal-title-text"></span></div>
+        <div class="modal-msg"></div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel">キャンセル</button>
+          <button class="modal-btn ${danger ? 'modal-btn-danger' : 'modal-btn-ok'}">${escHtml(okText)}</button>
+        </div>
+      </div>`;
+    overlay.querySelector('.modal-title-text').textContent = title;
+    overlay.querySelector('.modal-msg').textContent = msg;
+    document.body.appendChild(overlay);
+    const btns = overlay.querySelectorAll('.modal-btn');
+    const close = (val) => { overlay.remove(); resolve(val); };
+    btns[0].onclick = () => close(false);
+    btns[1].onclick = () => close(true);
+    overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+  });
+}
+
 // ========== 明細の項目名（ラベル編集＋列ON/OFF） ==========
 // 列の定義。i＝位置（client.html/index.jsと共通）、opt＝表示ON/OFF可能な列。
 // 位置：0作業日 1サービス名 2数量 3単価 4金額 5備考（税率は固定・columns対象外）。
 const COL_DEFS = [
-  { i: 0, def: '作業日',    opt: false },
-  { i: 1, def: 'サービス名', opt: false },
-  { i: 2, def: '数量',      opt: true },
-  { i: 3, def: '単価（円）', opt: true },
-  { i: 4, def: '金額（円）', opt: false },
-  { i: 5, def: '備考',      opt: true },
+  { i: 0, def: '日付',        opt: false },
+  { i: 1, def: '内容',        opt: false },
+  { i: 2, def: '数量',        opt: true },
+  { i: 3, def: '単価（税抜）', opt: true },
+  { i: 4, def: '金額（税抜）', opt: false },
+  { i: 5, def: '備考',        opt: true },
 ];
 
 // 保存済みcolumns（無ければnull）でUIを初期化。新規登録時はデフォルト名・全ON。
@@ -510,7 +643,7 @@ document.getElementById('newClientBtn').addEventListener('click', () => {
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const clientName = document.getElementById('clientName').value.trim();
   if (!clientName) {
-    alert('クライアント名を入力してください');
+    showToast('クライアント名を入力してください', 'error');
     return;
   }
 
@@ -563,12 +696,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     editingIdField.value = clientId;
     document.getElementById('editingBadge').style.display = 'block';
 
-    alert(`保存しました！\nクライアント名：${clientName}\nID：${clientId}`);
+    showToast(`保存しました：${clientName}`, 'success');
     loadClientList();
     saveBtn.textContent = '設定を保存する';
     saveBtn.disabled = false;
   } catch(e) {
-    alert('保存に失敗しました：' + e.message);
+    showToast('保存に失敗しました：' + e.message, 'error');
     document.getElementById('saveBtn').textContent = '設定を保存する';
     document.getElementById('saveBtn').disabled = false;
   }
@@ -630,7 +763,10 @@ window.copyUrl = function(btn, url) {
 // ========== クライアントの削除 ==========
 
 window.deleteClient = async function(clientId, clientName) {
-  const ok = confirm(`「${clientName}」を削除します。\nこのクライアントの設定・取引先データはすべて削除され、元に戻せません。\n本当に削除しますか？`);
+  const ok = await showConfirm(
+    'このクライアントの設定・取引先データはすべて削除され、元に戻せません。本当に削除しますか？',
+    { title: `「${clientName}」を削除`, okText: '削除する', danger: true }
+  );
   if (!ok) return;
 
   try {
@@ -643,10 +779,10 @@ window.deleteClient = async function(clientId, clientName) {
     // クライアント本体を削除
     await deleteDoc(doc(db, 'clients', clientId));
 
-    alert('削除しました。');
+    showToast('削除しました', 'success');
     loadClientList();
   } catch(e) {
-    alert('削除に失敗しました：' + e.message);
+    showToast('削除に失敗しました：' + e.message, 'error');
   }
 };
   // ========== データのバックアップ（全クライアント＋取引先をJSONで出力） ==========
@@ -684,7 +820,7 @@ document.getElementById('backupBtn').addEventListener('click', async () => {
     URL.revokeObjectURL(url);
 
   } catch(e) {
-    alert('バックアップの取得に失敗しました：' + e.message);
+    showToast('バックアップの取得に失敗しました：' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'バックアップをダウンロード（JSON）';
@@ -713,7 +849,7 @@ document.getElementById('restoreFileInput').addEventListener('change', async (e)
     const text = await file.text();
     const data = JSON.parse(text);
     if (!Array.isArray(data)) {
-      alert('バックアップファイルの形式が正しくありません。');
+      showToast('バックアップファイルの形式が正しくありません。', 'error');
       return;
     }
 
@@ -724,7 +860,7 @@ document.getElementById('restoreFileInput').addEventListener('change', async (e)
     ).join('');
     document.getElementById('restoreSelectArea').style.display = 'block';
   } catch(err) {
-    alert('ファイルの読み込みに失敗しました：' + err.message);
+    showToast('ファイルの読み込みに失敗しました：' + err.message, 'error');
   }
 });
 
@@ -736,10 +872,9 @@ document.getElementById('restoreBtn').addEventListener('click', async () => {
   const clientData = restoreBackupData.find(c => c.id === targetId);
   if (!clientData) return;
 
-  const ok = confirm(
-    `「${clientData.clientName}」のデータを復元します。\n` +
-    `現在のこのクライアントのデータ（設定・取引先）はすべて上書き・削除され、バックアップ時点の状態に戻ります。\n` +
-    `よろしいですか？`
+  const ok = await showConfirm(
+    '現在のこのクライアントのデータ（設定・取引先）はすべて上書き・削除され、バックアップ時点の状態に戻ります。よろしいですか？',
+    { title: `「${clientData.clientName}」を復元`, okText: '復元する', danger: true }
   );
   if (!ok) return;
 
@@ -767,13 +902,13 @@ document.getElementById('restoreBtn').addEventListener('click', async () => {
       await setDoc(doc(db, 'clients', id, 'partners', partnerId), partnerFields);
     }
 
-    alert('復元が完了しました。');
+    showToast('復元が完了しました', 'success');
     loadClientList();
     restoreBackupData = null;
     document.getElementById('restoreSelectArea').style.display = 'none';
     document.getElementById('restoreFileInput').value = '';
   } catch(e) {
-    alert('復元に失敗しました：' + e.message);
+    showToast('復元に失敗しました：' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'このクライアントを復元する';
@@ -786,7 +921,7 @@ window.editClient = async function(clientId) {
   try {
     const snap = await getDoc(doc(db, 'clients', clientId));
     if (!snap.exists()) {
-      alert('クライアントデータが見つかりませんでした');
+      showToast('クライアントデータが見つかりませんでした', 'error');
       return;
     }
     const d = snap.data();
@@ -809,7 +944,7 @@ window.editClient = async function(clientId) {
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch(e) {
-    alert('読み込みに失敗しました：' + e.message);
+    showToast('読み込みに失敗しました：' + e.message, 'error');
   }
 };
 
