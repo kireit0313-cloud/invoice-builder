@@ -2122,7 +2122,10 @@ function getIssueDate() {
   return document.getElementById('issueDateDisplay')?.textContent || calcIssueDate('末日');
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 // 列ラベル取得（Excelのcolumnsから、なければデフォルト）
 // 順序：作業日・サービス名・数量・単価・金額・備考（税率は固定・対象外）
 function getColumnLabels() {
