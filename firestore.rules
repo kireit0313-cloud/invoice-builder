@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// invoice-builder Firestore セキュリティルール（プロジェクト: invoice-builder-4b77e）
+// ------------------------------------------------------------------------
+// このファイルはローカルミラー上の「参照・バックアップ用コピー」です。
+// 実際の適用はFirebaseコンソール（Firestore Database → ルール）で貼り付け→公開して行います
+// （このリポジトリからの自動デプロイはありません）。編集したら必ずコンソールにも反映してください。
+//
+// 設計方針：
+//  - clientId は管理画面で crypto.randomUUID() 生成＝推測困難な「秘密URL」。顧客はURLで自分のデータのみ操作。
+//  - 顧客ページ（client.html）はログイン不要。自分の clients/{id} の会社情報更新と partners の読み書きが必要。
+//  - 管理画面（index.html）は Tsuyoshi 本人のみ。全クライアントの一覧・作成・削除・社名変更ができる。
+//  - 上記以外（他コレクション等）はすべて既定拒否。
+// ------------------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 管理者＝Tsuyoshi本人のGoogleアカウントのみ。
+    // ※ログイン済みなら誰でも(request.auth != null)ではなく、メールで本人に限定する。
+    //   Googleアカウントを変更した場合は下のメールアドレスを更新すること。
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'kireit0313@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    match /clients/{clientId} {
+      // 顧客：自分のURL(id)で自分のクライアント文書を1件取得できる。
+      allow get: if true;
+
+      // 一覧(列挙)は管理者のみ。未認証・他人はUUIDを列挙できない＝秘密URL方式を守る。
+      allow list: if isAdmin();
+
+      // クライアントの新規作成・削除は管理者のみ（スパム作成・破壊を防ぐ）。
+      allow create, delete: if isAdmin();
+
+      // 更新：管理者は自由。顧客(未認証)は「会社情報の保存」に限り許可し、
+      //       社名・clientName・clientId は変更させない（なりすまし・改ざん防止）。
+      allow update: if isAdmin()
+        || (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['companyInfo', 'projectFields', 'updatedAt'])
+          && request.resource.data.companyInfo.name == resource.data.companyInfo.name
+          && request.resource.data.clientName == resource.data.clientName
+          && request.resource.data.clientId == resource.data.clientId
+        );
+
+      // 取引先：既知のclientId配下でのみ読み書き可（顧客が自分の取引先を管理する）。
+      // ※write は create/update/delete を含む。秘密URLを知る前提での開放。
+      match /partners/{partnerId} {
+        allow get: if true;
+        allow list: if true;
+        allow write: if true;
+      }
+    }
+  }
+}

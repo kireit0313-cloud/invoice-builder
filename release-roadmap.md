@@ -29,10 +29,10 @@
 
 ## フェーズ2：堅牢性・セキュリティ（リスク回避）
 
-- [ ] Firestoreルールの権限境界：他クライアントのclientId／partnerIdに書き込めないか、未認証で読めないか
+- [x] **【2026/7/12 対応・本番検証済み】Firestoreルールの権限境界**：全体設計は元々良好（`list`は認証必須で列挙不可、`create/delete`は認証必須、未認証`update`は`companyInfo`等に限定＋社名/clientName/clientId改変不可、既定拒否、clientIdはUUIDの秘密URL方式）。**唯一の穴＝管理者判定が`request.auth != null`（＝ログイン済みなら誰でも）**だったのを、本人メールに絞る`isAdmin()`（`email == 'kireit0313@gmail.com' && email_verified`）に置換。本番で検証＝本人ログインは一覧表示OK／別Googleアカウントは一覧が`Missing or insufficient permissions`で拒否／顧客ページ（未認証）の保存は不変で正常。ルール本文は`invoice-builder/firestore.rules`にバックアップ保存（参照用・自動デプロイなし）。詳細はCONTEXT㉛。残存（許容）：partnersサブコレクションは既知clientId配下で全開放（秘密URL前提）。
 - [ ] 入力バリデーション：空欄・異常値・極端に長い文字列・特殊文字（`onclick`のdata-*化を再点検）
 - [ ] 例外処理：Cloud RunのPDF生成失敗・ネットワーク断時にトーストで止まるか（内部エラーを生で見せない）
-- [ ] 認証：Auth承認済みドメイン、管理画面がTsuyoshi以外からアクセスできないこと
+- [x] **【2026/7/12 対応】認証：管理画面がTsuyoshi以外からアクセスできないこと**。二重化で対応＝(1)Firestoreルールの`isAdmin()`でデータを本人メールに限定（本番検証済み・上記）、(2)index.htmlの`onAuthStateChanged`に本人メール以外は即`signOut`＋「アクセス権限がありません」表示のUIガードを追加（**反映済み・本番検証済み**＝別アカウントでログインすると即ログアウトされ「このアカウントには管理画面へのアクセス権限がありません。」がログイン画面に表示されることを確認）。Auth承認済みドメインはVercel本番URLを追加済み（CONTEXT①）。**両層とも本番で検証完了。**
 - [x] **【2026/7/12 判断確定】Safariで管理画面ログイン不可 → PC運用で確定（対応不要）**。中継方式（Vercel rewriteで認証を同一ドメイン化＋authDomainをvercelドメインに変更）を実際に試したが、本アプリのログインは`signInWithPopup`方式のため不適合で、Chrome/Edgeまでログイン不可に後退（Googleの認証リダイレクト先＝firebaseapp.com登録とズレて`missing initial state`）。→ authDomainを`firebaseapp.com`へロールバックしChrome/Edgeログイン復旧を実機確認。**決定：管理画面はPC（Chrome/Edge）運用で確定、Safari対応は追わない**（Tsuyoshiさんが管理画面をSafariで使う予定なし）。**顧客画面（client.html）は認証コード自体が無く＝ログイン不要のためSafari/iPhoneでも無影響**。`vercel.json`の中継定義は無害な待機状態で残置（将来Safari対応を再開する際の土台。再開時はGoogle CloudのOAuthクライアントに承認済みリダイレクトURI/JS生成元としてvercelドメイン追加が必要＝今回未実施）。詳細はCONTEXT㉚。
 - [ ] HTTPS：Vercel／Cloud Runの自動HTTPSを確認のみ（HTTP→HTTPSリダイレクト含む）
 
