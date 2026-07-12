@@ -513,13 +513,27 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+// 管理者＝Tsuyoshi本人のGoogleアカウントのみ。Firestoreルールの isAdmin() と同じメールに合わせる。
+// （Googleアカウントを変更したらここと firestore.rules の両方を更新する）
+const ADMIN_EMAIL = 'kireit0313@gmail.com';
+
 // ログイン状態を監視
-onAuthStateChanged(auth, user => {
-  if (user) {
+onAuthStateChanged(auth, async user => {
+  if (user && user.email === ADMIN_EMAIL && user.emailVerified) {
+    // 本人：管理画面を表示
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
+    const sm = document.getElementById('statusMsg'); if (sm) sm.textContent = '';
     loadClientList();
+  } else if (user) {
+    // ログイン済みだが本人以外：即ログアウトして拒否メッセージ（ルール側でもデータは保護される）
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    await fbSignOut(auth);
+    const sm = document.getElementById('statusMsg');
+    if (sm) sm.textContent = 'このアカウントには管理画面へのアクセス権限がありません。';
   } else {
+    // 未ログイン
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
   }
