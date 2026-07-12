@@ -33,7 +33,7 @@
 - [ ] 入力バリデーション：空欄・異常値・極端に長い文字列・特殊文字（`onclick`のdata-*化を再点検）
 - [ ] 例外処理：Cloud RunのPDF生成失敗・ネットワーク断時にトーストで止まるか（内部エラーを生で見せない）
 - [ ] 認証：Auth承認済みドメイン、管理画面がTsuyoshi以外からアクセスできないこと
-- [ ] **【要対応・2026/7/12発見】Safariで管理画面ログイン不可（`Unable to process request due to missing initial state`）**。原因＝認証ドメイン（`invoice-builder-4b77e.firebaseapp.com`）がアプリ（`invoice-builder-iota-lac.vercel.app`）と別ドメインで、Safariのストレージ分離（ITP）で認証の初期状態が読めない。方式をリダイレクトに変えるだけでは不可。対応＝Vercelで`/__/auth/*`等をfirebaseapp.comへ中継するrewrite（`vercel.json`）を追加し、`authDomain`をvercelドメインに変えて同一ドメイン化（index.html・client.html両方のfirebaseConfig）。反映後は全ブラウザで**ログインのみ**再確認。影響は管理画面のみ・PC運用で回避可（顧客のclient.htmlはログイン不要で無影響）。
+- [x] **【2026/7/12 判断確定】Safariで管理画面ログイン不可 → PC運用で確定（対応不要）**。中継方式（Vercel rewriteで認証を同一ドメイン化＋authDomainをvercelドメインに変更）を実際に試したが、本アプリのログインは`signInWithPopup`方式のため不適合で、Chrome/Edgeまでログイン不可に後退（Googleの認証リダイレクト先＝firebaseapp.com登録とズレて`missing initial state`）。→ authDomainを`firebaseapp.com`へロールバックしChrome/Edgeログイン復旧を実機確認。**決定：管理画面はPC（Chrome/Edge）運用で確定、Safari対応は追わない**（Tsuyoshiさんが管理画面をSafariで使う予定なし）。**顧客画面（client.html）は認証コード自体が無く＝ログイン不要のためSafari/iPhoneでも無影響**。`vercel.json`の中継定義は無害な待機状態で残置（将来Safari対応を再開する際の土台。再開時はGoogle CloudのOAuthクライアントに承認済みリダイレクトURI/JS生成元としてvercelドメイン追加が必要＝今回未実施）。詳細はCONTEXT㉚。
 - [ ] HTTPS：Vercel／Cloud Runの自動HTTPSを確認のみ（HTTP→HTTPSリダイレクト含む）
 
 ---
