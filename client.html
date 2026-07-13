@@ -1539,6 +1539,7 @@ window.bulkBackupExport = async function() {
   try {
     const zip = new JSZip();
     const today = todayStr().replace(/-/g, '');
+    const usedNames = {}; // ZIP内ファイル名の重複回避（同名取引先対策）
     for (const p of targets) {
       const items = bulkGetLineItems('betbl_' + p.id);
       const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
@@ -1558,7 +1559,14 @@ window.bulkBackupExport = async function() {
           remarksLower: p.remarksLower || '',
         },
       };
-      zip.file(`バックアップ_${p.partnerName || 'partner'}_${today}.json`, JSON.stringify(backup, null, 2));
+      let jsonName = `バックアップ_${p.partnerName || 'partner'}_${today}.json`;
+      if (usedNames[jsonName]) {
+        usedNames[jsonName]++;
+        jsonName = `バックアップ_${p.partnerName || 'partner'}(${usedNames[jsonName]})_${today}.json`;
+      } else {
+        usedNames[jsonName] = 1;
+      }
+      zip.file(jsonName, JSON.stringify(backup, null, 2));
     }
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(zipBlob);
@@ -1589,6 +1597,7 @@ window.bulkEditExport = async function() {
     const docLabel = '請求書';
     const today = todayStr();
     const failed = []; // 失敗した取引先名（部分失敗をユーザーに知らせる）
+    const usedNames = {}; // ZIP内ファイル名の重複回避（同名取引先対策）
 
     for (let i = 0; i < targets.length; i++) {
       const p = targets[i];
@@ -1604,7 +1613,14 @@ window.bulkEditExport = async function() {
       try {
         const blob = await generatePDF(p.partnerName, items, freeFields, issueDateBulk, p.honorific, remarksLower, invoiceNo);
         const buf  = await blob.arrayBuffer();
-        zip.file(`${docLabel}_${p.partnerName}_${today}.pdf`, buf);
+        let pdfName = `${docLabel}_${p.partnerName}_${today}.pdf`;
+        if (usedNames[pdfName]) {
+          usedNames[pdfName]++;
+          pdfName = `${docLabel}_${p.partnerName}(${usedNames[pdfName]})_${today}.pdf`;
+        } else {
+          usedNames[pdfName] = 1;
+        }
+        zip.file(pdfName, buf);
 
         // Firestoreへ保存（先月データ更新）
         await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
