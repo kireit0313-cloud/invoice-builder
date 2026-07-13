@@ -1208,6 +1208,7 @@ window.exportPDF = async function() {
   const btn = document.getElementById('pdfBtn');
   btn.textContent = 'PDF生成中...';
   btn.disabled = true;
+  let pdfDone = false; // PDFダウンロード後の保存失敗を区別する
   try {
     const items      = getLineItems();
     const freeFields = getFreeFields();
@@ -1223,6 +1224,7 @@ window.exportPDF = async function() {
     a.download = `請求書_${currentPartner.partnerName}_${todayStr().replace(/-/g,'')}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
+    pdfDone = true;
 
     // Firestoreへ保存（次月の「先月データ」になる）
     await setDoc(doc(db, 'clients', clientId, 'partners', currentPartnerId), {
@@ -1240,7 +1242,11 @@ window.exportPDF = async function() {
     currentPartner.invoiceNo  = invoiceNo;
 
   } catch(e) {
-    showToast('PDF生成に失敗しました：' + e.message, 'error');
+    if (pdfDone) {
+      showToast('PDFは出力されましたが、内容の保存に失敗しました：' + e.message, 'error');
+    } else {
+      showToast('PDF生成に失敗しました。' + e.message, 'error');
+    }
   } finally {
     btn.innerHTML = 'PDF<br class="br-sp">出力';
     btn.disabled = false;
@@ -1262,14 +1268,24 @@ async function generatePDF(partnerName, items, freeFields, issueDate, honorific,
     colFlags:     { qty: colEnabled('qty'), price: colEnabled('price'), remark: colEnabled('remark') },
     invoiceNo:    invoiceNo || '',
   };
-  const res = await fetch(`${PDF_SERVER}/generate-pdf`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch(`${PDF_SERVER}/generate-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    // ネットワーク断・サーバー到達不可（fetch自体の失敗）。内部エラー文言は出さない。
+    console.error('PDFサーバーへの接続失敗:', e);
+    throw new Error('サーバーに接続できませんでした。ネットワーク接続をご確認のうえ、もう一度お試しください。');
+  }
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'サーバーエラー');
+    // エラー本文はJSONとは限らない（Cloud Run障害時はHTML/テキストのことがある）。安全に読み、詳細はconsoleのみ。
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch (_) {}
+    console.error('PDFサーバーエラー:', res.status, detail);
+    throw new Error(`サーバーでエラーが発生しました（コード：${res.status}）。時間をおいてもう一度お試しください。`);
   }
   return await res.blob();
 }
@@ -1558,6 +1574,7 @@ window.bulkEditExport = async function() {
     const zip = new JSZip();
     const docLabel = '請求書';
     const today = todayStr();
+    const failed = []; // 失敗した取引先名（部分失敗をユーザーに知らせる）
 
     for (let i = 0; i < targets.length; i++) {
       const p = targets[i];
@@ -1588,7 +1605,15 @@ window.bulkEditExport = async function() {
 
       } catch(e) {
         console.warn(`${p.partnerName} のPDF生成失敗:`, e.message);
+        failed.push(p.partnerName || '（名前なし）');
       }
+    }
+
+    // 全件失敗：ZIPを出さずにエラー表示（空ZIPのダウンロードで成功と誤解させない）
+    if (failed.length === targets.length) {
+      progress.textContent = '出力できませんでした';
+      showToast('一括PDF出力に失敗しました。サーバーまたはネットワークの状態をご確認のうえ、もう一度お試しください。', 'error');
+      return;
     }
 
     const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -1599,8 +1624,15 @@ window.bulkEditExport = async function() {
     a.click();
     URL.revokeObjectURL(url);
 
-    progress.textContent = '完了！';
-    setTimeout(() => showPartnerList(), 1500);
+    if (failed.length > 0) {
+      // 部分失敗：ZIPは出すが、欠けている取引先を明示する
+      progress.textContent = `完了（成功${targets.length - failed.length}件／失敗${failed.length}件）`;
+      showToast(`一部のPDFを生成できませんでした（ZIPに含まれていません）：${failed.join('、')}`, 'error');
+      setTimeout(() => showPartnerList(), 3500);
+    } else {
+      progress.textContent = '完了！';
+      setTimeout(() => showPartnerList(), 1500);
+    }
 
   } catch(e) {
     showToast('一括PDF出力に失敗しました：' + e.message, 'error');
