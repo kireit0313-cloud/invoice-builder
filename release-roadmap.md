@@ -30,21 +30,25 @@
 ## フェーズ2：堅牢性・セキュリティ（リスク回避）
 
 - [x] **【2026/7/12 対応・本番検証済み】Firestoreルールの権限境界**：全体設計は元々良好（`list`は認証必須で列挙不可、`create/delete`は認証必須、未認証`update`は`companyInfo`等に限定＋社名/clientName/clientId改変不可、既定拒否、clientIdはUUIDの秘密URL方式）。**唯一の穴＝管理者判定が`request.auth != null`（＝ログイン済みなら誰でも）**だったのを、本人メールに絞る`isAdmin()`（`email == 'kireit0313@gmail.com' && email_verified`）に置換。本番で検証＝本人ログインは一覧表示OK／別Googleアカウントは一覧が`Missing or insufficient permissions`で拒否／顧客ページ（未認証）の保存は不変で正常。ルール本文は`invoice-builder/firestore.rules`にバックアップ保存（参照用・自動デプロイなし）。詳細はCONTEXT㉛。残存（許容）：partnersサブコレクションは既知clientId配下で全開放（秘密URL前提）。
-- [ ] 入力バリデーション：空欄・異常値・極端に長い文字列・特殊文字（`onclick`のdata-*化を再点検）
-- [ ] 例外処理：Cloud RunのPDF生成失敗・ネットワーク断時にトーストで止まるか（内部エラーを生で見せない）
+- [x] **【2026/7/13 対応・要実機確認】入力バリデーション**：空欄・異常値は既存ガードで問題なし（空欄チェック・`parseFloat||0`・`min="0"`）。特殊文字＝index.htmlクライアント一覧の`clientName`未エスケープ＋削除ボタン`onclick`直埋めを`escHtml`＋`data-*`方式に改修（本丸）、client.htmlの発行日・締め日・明細見出しラベルも`escHtml`化。極端に長い文字列＝全入力欄に`maxlength`付与（クライアント名/取引先名60、明細内容150、自由項目値300、下段1000等）。node --checkOK。**GitHubへUpload後、管理画面の一覧表示・URLコピー・編集・削除の実機確認が必要**（詳細CONTEXT㉝）。
+- [x] **【2026/7/13 対応・要実機確認】例外処理**：Firestore系catchは全箇所トースト済みで問題なし。PDF系4件を修正＝①非JSONエラー応答（Cloud Run障害時のHTML等）で生の解析エラーが出る→日本語の定型文＋詳細はconsoleのみ、②ネットワーク断の`Failed to fetch`生表示→「サーバーに接続できませんでした…」、③一括出力の部分失敗がサイレント（「完了！」＋欠けたZIP）→失敗名を集計し全失敗はZIP出さず・部分失敗は欠けた取引先名をトースト表示、④PDF成功後の保存失敗で「PDF生成に失敗」と誤表示→「PDFは出力されましたが保存に失敗」に区別。nodeハーネス7ケース検証済み。**Upload後、機内モード等での接続エラートースト実機確認が必要**（詳細CONTEXT㉞）。
 - [x] **【2026/7/12 対応】認証：管理画面がTsuyoshi以外からアクセスできないこと**。二重化で対応＝(1)Firestoreルールの`isAdmin()`でデータを本人メールに限定（本番検証済み・上記）、(2)index.htmlの`onAuthStateChanged`に本人メール以外は即`signOut`＋「アクセス権限がありません」表示のUIガードを追加（**反映済み・本番検証済み**＝別アカウントでログインすると即ログアウトされ「このアカウントには管理画面へのアクセス権限がありません。」がログイン画面に表示されることを確認）。Auth承認済みドメインはVercel本番URLを追加済み（CONTEXT①）。**両層とも本番で検証完了。**
 - [x] **【2026/7/12 判断確定】Safariで管理画面ログイン不可 → PC運用で確定（対応不要）**。中継方式（Vercel rewriteで認証を同一ドメイン化＋authDomainをvercelドメインに変更）を実際に試したが、本アプリのログインは`signInWithPopup`方式のため不適合で、Chrome/Edgeまでログイン不可に後退（Googleの認証リダイレクト先＝firebaseapp.com登録とズレて`missing initial state`）。→ authDomainを`firebaseapp.com`へロールバックしChrome/Edgeログイン復旧を実機確認。**決定：管理画面はPC（Chrome/Edge）運用で確定、Safari対応は追わない**（Tsuyoshiさんが管理画面をSafariで使う予定なし）。**顧客画面（client.html）は認証コード自体が無く＝ログイン不要のためSafari/iPhoneでも無影響**。`vercel.json`の中継定義は無害な待機状態で残置（将来Safari対応を再開する際の土台。再開時はGoogle CloudのOAuthクライアントに承認済みリダイレクトURI/JS生成元としてvercelドメイン追加が必要＝今回未実施）。詳細はCONTEXT㉚。
-- [ ] HTTPS：Vercel／Cloud Runの自動HTTPSを確認のみ（HTTP→HTTPSリダイレクト含む）
+- [x] **【2026/7/13 確認済み】HTTPS**：`http://`アクセスで Vercel本番URL・Cloud Run PDFサーバーとも`https://`へ自動リダイレクトされることを実アクセスで確認。コード内の参照（`PDF_SERVER`等）もすべてhttps。対応不要。
+
+> **フェーズ2完了（2026/7/13）**。㉝㉞のUpload＋実機確認が済んだら完全クローズ。
 
 ---
 
 ## フェーズ3：運用・法務・再現性
 
-- [ ] 依存固定の再点検：Node22／Puppeteer21.11.0／自前Chromium
-- [ ] Google Fonts読込安定性（角印Yuji Syukuの `document.fonts.ready` 待ちの実効性）
-- [ ] 法務：利用規約・プライバシーポリシー（顧客データを預かる立場。顧客先URLへの掲示要否を検討）
-- [ ] バックアップ体制：Firestoreエクスポート方針の確立（コードはGitHubがオフサイト保管）
-- [ ] ロールバック手順の明文化：Vercel＝過去Deploymentへ即戻し、Cloud Run＝Actions再実行／前リビジョン切替
+- [x] **【2026/7/13 対応・デプロイ＋PDF実機確認済み】依存固定の再点検**：Node22✅／puppeteer 21.11.0正確固定✅（GitHub側`^21.0.0`に見えたのはCDNキャッシュ、キャッシュ回避で21.11.0確認）／lockコミット済み・ミラーと一致✅／apt Chromium不使用✅／deploy.yml標準形✅。**改善2件を実施**＝①Dockerfileを`npm install`→`npm ci --omit=dev`（lockを厳密適用、矛盾はビルド失敗で検知）、②expressを`^4.18.2`→`4.22.2`正確固定（package.json＋lockの宣言部を同時修正、npm ciの整合検査に適合）。詳細CONTEXT㊱。
+- [x] **【2026/7/13 対応・デプロイ＋PDF実機確認済み】Google Fonts読込安定性**：既存の`networkidle0`＋`document.fonts.ready`は堅牢と確認。弱点＝Google Fonts無応答（ハング）時に全体が既定30秒待たされる点を堅牢化＝`setContent`に`timeout:15000`＋catchで続行、`fonts.ready`は3秒の`Promise.race`打ち切り。いずれも打ち切り時はフォールバック書体でPDF出力を続行（生成失敗にはならない）。スタブ検証済み。詳細CONTEXT㊲。
+- [x] **【2026/7/13 対応・要Upload＋実機確認】法務：利用規約・プライバシーポリシー**：草案md 2本（`利用規約（草案）.md`・`プライバシーポリシー（草案）.md`）を作成しTsuyoshiさん確認済み（制定日2026/7/13・株式会社キレイット・賠償上限＝支払対価総額・終了予告＝原則3か月・連絡先0313labo@gmail.com）。掲示＝**顧客ページにリンク＋納品時文書**方式。`terms.html`・`privacy.html`（アプリと同デザインの静的ページ）を新規作成し、`client.html`フッターに小さくリンク追加。**Upload対象＝client.html・terms.html・privacy.htmlの3ファイル**（Vercel自動反映）。※草案はたたき台であり、必要に応じて専門家確認を推奨。
+
+> **フェーズ3完了（2026/7/13）**。法務3ファイルのUpload＋実機確認で完全クローズ。次はフェーズ4（リリース当日）＝スモークテスト＋初回納品フロー実測。
+- [x] **【2026/7/13 方針確立・要リストアテスト1回】バックアップ体制**：`invoice-builder/バックアップ体制.md`を新規作成。方針＝管理画面の全体JSONバックアップ（全クライアント＋取引先込みの完全出力と確認済み）を**月1回＋節目**に取得し、**PCローカル＋外部（クラウド/USB）の2箇所**保管、直近3世代＋月次を保持。GCPマネージドエクスポート/PITRは非エンジニア運用に不適合＋データ量に過剰のため見送り（記録済み）。**残り作業＝テスト用クライアントで復元テストを1回実施**（これで完全クローズ）。
+- [x] **【2026/7/13 完了】ロールバック手順の明文化**：`invoice-builder/ロールバック手順.md`を新規作成。層別の切り分け表＋Vercel（Instant Rollback）／Cloud Run（前リビジョンへトラフィック切替、代替＝GitHub再デプロイ）／Firestoreルール（履歴 or `firestore.rules`貼り付け）／データ復元（JSON）＋「戻した後にGitHub・ミラーも揃える」共通チェックリスト。全手順クリックのみ・ターミナル不要。
 
 ---
 
