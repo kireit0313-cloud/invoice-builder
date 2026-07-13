@@ -878,7 +878,7 @@ document.getElementById('restoreFileInput').addEventListener('change', async (e)
     restoreBackupData = data;
     const select = document.getElementById('restoreClientSelect');
     select.innerHTML = data.map(c =>
-      `<option value="${c.id}">${(c.clientName || '(名称未設定)')}</option>`
+      `<option value="${escHtml(c.id)}">${escHtml(c.clientName || '(名称未設定)')}（ID: ${escHtml(String(c.id).slice(0, 8))}）</option>`
     ).join('');
     document.getElementById('restoreSelectArea').style.display = 'block';
   } catch(err) {
