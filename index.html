@@ -363,7 +363,7 @@ body {
     <!-- ①クライアント名入力カード -->
     <div class="card">
       <p class="card-title">クライアント名を入力</p>
-      <input type="text" id="clientName" class="client-input">
+      <input type="text" id="clientName" class="client-input" maxlength="60">
       <input type="hidden" id="editingClientId" value="">
       <div id="editingBadge" style="display:none;margin-top:8px;font-size:12px;color:var(--ink-soft);">
         既存クライアントを編集中です
@@ -376,7 +376,7 @@ body {
       <p class="card-title">会社情報</p>
 
       <label style="font-size:12px;color:var(--ink-soft);">会社名（屋号）</label>
-      <input type="text" id="companyName" class="client-input"
+      <input type="text" id="companyName" class="client-input" maxlength="60"
         style="margin-bottom:10px;">
 
       <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;">
@@ -407,23 +407,23 @@ body {
       <div id="colRows">
         <div class="col-row">
           <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName0" class="client-input col-name-input">
+          <input type="text" id="colName0" class="client-input col-name-input" maxlength="20">
         </div>
         <div class="col-row">
           <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName1" class="client-input col-name-input">
+          <input type="text" id="colName1" class="client-input col-name-input" maxlength="20">
         </div>
         <div class="col-row">
           <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn2" checked> 表示</label>
-          <input type="text" id="colName2" class="client-input col-name-input">
+          <input type="text" id="colName2" class="client-input col-name-input" maxlength="20">
         </div>
         <div class="col-row">
           <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn3" checked> 表示</label>
-          <input type="text" id="colName3" class="client-input col-name-input">
+          <input type="text" id="colName3" class="client-input col-name-input" maxlength="20">
         </div>
         <div class="col-row">
           <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName4" class="client-input col-name-input">
+          <input type="text" id="colName4" class="client-input col-name-input" maxlength="20">
         </div>
         <div class="col-row">
           <span class="col-badge col-badge-fixed">固定</span>
@@ -431,7 +431,7 @@ body {
         </div>
         <div class="col-row">
           <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn5" checked> 表示</label>
-          <input type="text" id="colName5" class="client-input col-name-input">
+          <input type="text" id="colName5" class="client-input col-name-input" maxlength="20">
         </div>
       </div>
     </div>
@@ -751,16 +751,16 @@ async function loadClientList() {
       const url = `${location.origin}/client.html?id=${encodeURIComponent(d.clientId)}`;
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${d.clientName}</td>
+        <td>${escHtml(d.clientName || '')}</td>
         <td style="color:var(--ink-soft)">${date}</td>
         <td>
-          <button class="copy-url-btn" onclick="copyUrl(this, '${url}')">
+          <button class="copy-url-btn" data-url="${escHtml(url)}" onclick="copyUrl(this, this.dataset.url)">
             URLをコピー
           </button>
-          <button class="copy-url-btn" onclick="editClient('${docSnap.id}')">
+          <button class="copy-url-btn" data-id="${escHtml(docSnap.id)}" onclick="editClient(this.dataset.id)">
             編集
           </button>
-          <button class="copy-url-btn" style="color:#c0392b;border-color:#e6b3ab;" onclick="deleteClient('${docSnap.id}', '${d.clientName.replace(/'/g, "\\'")}')">
+          <button class="copy-url-btn" style="color:#c0392b;border-color:#e6b3ab;" data-id="${escHtml(docSnap.id)}" data-name="${escHtml(d.clientName || '')}" onclick="deleteClient(this.dataset.id, this.dataset.name)">
             削除
           </button>
         </td>
@@ -768,7 +768,7 @@ async function loadClientList() {
       tbody.appendChild(tr);
     });
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="3" style="color:red">読み込みエラー: ${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" style="color:red">読み込みエラー: ${escHtml(e.message)}</td></tr>`;
   }
 }
 

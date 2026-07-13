@@ -756,7 +756,7 @@ function renderPartnerList() {
 
       <!-- 取引先追加 -->
       <div class="add-partner-area" style="margin-top:1rem;">
-        <input type="text" class="add-partner-input" id="newPartnerName" placeholder="取引先名を入力">
+        <input type="text" class="add-partner-input" id="newPartnerName" placeholder="取引先名を入力" maxlength="60">
         <select id="newPartnerHonorific" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
           <option value="御中">御中</option>
           <option value="様">様</option>
@@ -916,13 +916,13 @@ function showDetailScreen(partner, imported) {
         <span id="issueDateDisplay" style="font-size:15px;font-weight:bold;"></span>
         <span id="issueDayLabel" style="font-size:13px;color:var(--ink-soft);"></span>
         <button class="add-field-btn" onclick="toggleIssueDateEdit()" style="margin:0;">変更</button>
-        <input type="text" id="issueDateCustom" placeholder="例：2026年7月31日"
+        <input type="text" id="issueDateCustom" placeholder="例：2026年7月31日" maxlength="30"
           style="display:none;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:200px;"
           oninput="updateIssueDateDisplay()">
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;">
         <label for="invoiceNoInput" style="font-size:13px;color:var(--ink);min-width:84px;">請求書番号</label>
-        <input type="text" id="invoiceNoInput" placeholder="任意（例：2026-0710-001）" autocomplete="off"
+        <input type="text" id="invoiceNoInput" placeholder="任意（例：2026-0710-001）" autocomplete="off" maxlength="40"
           style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:220px;">
         <span style="font-size:12px;color:var(--ink-soft);">空欄ならPDFに表示されません（請求日の上に表示）</span>
       </div>
@@ -945,13 +945,13 @@ function showDetailScreen(partner, imported) {
         <table class="items-table">
           <thead>
             <tr>
-              <th class="col-date">${getColumnLabels()[0]}</th>
-              <th class="col-service">${getColumnLabels()[1]}</th>
-              <th class="col-qty"${colHideStyle('qty')}>${getColumnLabels()[2]}</th>
-              <th class="col-price"${colHideStyle('price')}>${getColumnLabels()[3]}</th>
-              <th class="col-amount">${getColumnLabels()[4]}</th>
+              <th class="col-date">${escHtml(getColumnLabels()[0])}</th>
+              <th class="col-service">${escHtml(getColumnLabels()[1])}</th>
+              <th class="col-qty"${colHideStyle('qty')}>${escHtml(getColumnLabels()[2])}</th>
+              <th class="col-price"${colHideStyle('price')}>${escHtml(getColumnLabels()[3])}</th>
+              <th class="col-amount">${escHtml(getColumnLabels()[4])}</th>
               <th class="col-tax">税率（%）</th>
-              <th class="col-remark"${colHideStyle('remark')}>${getColumnLabels()[5]}</th>
+              <th class="col-remark"${colHideStyle('remark')}>${escHtml(getColumnLabels()[5])}</th>
               <th class="col-delete"></th>
             </tr>
           </thead>
@@ -969,7 +969,7 @@ function showDetailScreen(partner, imported) {
     <div class="card">
       <p class="card-title">自由記入欄（下段）</p>
       <p class="hint" style="margin-top:-6px;">備考など。<br class="br-sp">未記入の場合はPDFに表示されません。</p>
-      <textarea id="remarksLowerInput" class="free-fields"
+      <textarea id="remarksLowerInput" class="free-fields" maxlength="1000"
         style="width:100%;min-height:70px;resize:vertical;font-family:inherit;font-size:14px;padding:8px;box-sizing:border-box;"></textarea>
     </div>
 
@@ -1024,8 +1024,8 @@ window.addFreeField = function(label, value) {
   div.className = 'free-field-row';
   div.id = id;
   div.innerHTML = `
-    <input type="text" class="free-field-label" placeholder="項目名（空欄可）" value="${escHtml(label)}" autocomplete="off">
-    <input type="text" class="free-field-value" placeholder="内容" value="${escHtml(value)}" autocomplete="off">
+    <input type="text" class="free-field-label" placeholder="項目名（空欄可）" value="${escHtml(label)}" autocomplete="off" maxlength="40">
+    <input type="text" class="free-field-value" placeholder="内容" value="${escHtml(value)}" autocomplete="off" maxlength="300">
     <button class="free-field-del" onclick="document.getElementById('${id}').remove()">×</button>
   `;
   area.appendChild(div);
@@ -1059,10 +1059,10 @@ window.addRow = function(item) {
 
   tr.innerHTML = `
     <td class="col-date">
-      <input type="text" value="${escHtml(String(dateVal))}" placeholder="" autocomplete="off">
+      <input type="text" value="${escHtml(String(dateVal))}" placeholder="" autocomplete="off" maxlength="50">
     </td>
     <td class="col-service">
-      <input type="text" value="${escHtml(String(svcVal))}" placeholder="" autocomplete="off">
+      <input type="text" value="${escHtml(String(svcVal))}" placeholder="" autocomplete="off" maxlength="150">
     </td>
     <td class="col-qty"${colHideStyle('qty')}>
       <input type="number" value="${qtyVal}" placeholder="" min="0" autocomplete="off"
@@ -1086,7 +1086,7 @@ window.addRow = function(item) {
       </div>
     </td>
     <td class="col-remark"${colHideStyle('remark')}>
-      <input type="text" value="${escHtml(String(remVal))}" placeholder="" autocomplete="off">
+      <input type="text" value="${escHtml(String(remVal))}" placeholder="" autocomplete="off" maxlength="150">
     </td>
     <td class="col-delete">
       <button class="delete-btn" onclick="deleteRow('${id}')">×</button>
@@ -1315,25 +1315,25 @@ window.openBulkEditMode = function() {
       <div class="bulk-edit-body" id="${bodyId}">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0 4px;">
           <span style="font-size:13px;color:var(--ink-soft);">発行日：</span>
-          <span style="font-size:14px;font-weight:bold;">${p.issueDate || calcIssueDate(p.issueDay || '末日')}</span>
-          <span style="font-size:12px;color:var(--ink-soft);">（締め日：${p.issueDay && p.issueDay !== '手入力' ? p.issueDay + '日' : p.issueDay || '末日'}）</span>
+          <span style="font-size:14px;font-weight:bold;">${escHtml(p.issueDate || calcIssueDate(p.issueDay || '末日'))}</span>
+          <span style="font-size:12px;color:var(--ink-soft);">（締め日：${escHtml(p.issueDay && p.issueDay !== '手入力' ? p.issueDay + '日' : p.issueDay || '末日')}）</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 0 8px;">
           <span style="font-size:13px;color:var(--ink);min-width:70px;">請求書番号</span>
-          <input type="text" id="beinv_${p.id}" value="${escHtml(p.invoiceNo || '')}" placeholder="任意（例：2026-0710-001）" autocomplete="off"
+          <input type="text" id="beinv_${p.id}" value="${escHtml(p.invoiceNo || '')}" placeholder="任意（例：2026-0710-001）" autocomplete="off" maxlength="40"
             style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:220px;">
         </div>
         <div class="table-scroll">
           <table class="items-table">
             <thead>
               <tr>
-                <th class="col-date">${getColumnLabels()[0]}</th>
-                <th class="col-service">${getColumnLabels()[1]}</th>
-                <th class="col-qty"${colHideStyle('qty')}>${getColumnLabels()[2]}</th>
-                <th class="col-price"${colHideStyle('price')}>${getColumnLabels()[3]}</th>
-                <th class="col-amount">${getColumnLabels()[4]}</th>
+                <th class="col-date">${escHtml(getColumnLabels()[0])}</th>
+                <th class="col-service">${escHtml(getColumnLabels()[1])}</th>
+                <th class="col-qty"${colHideStyle('qty')}>${escHtml(getColumnLabels()[2])}</th>
+                <th class="col-price"${colHideStyle('price')}>${escHtml(getColumnLabels()[3])}</th>
+                <th class="col-amount">${escHtml(getColumnLabels()[4])}</th>
                 <th class="col-tax">税率（%）</th>
-                <th class="col-remark"${colHideStyle('remark')}>${getColumnLabels()[5]}</th>
+                <th class="col-remark"${colHideStyle('remark')}>${escHtml(getColumnLabels()[5])}</th>
                 <th class="col-delete"></th>
               </tr>
             </thead>
@@ -1386,8 +1386,8 @@ window.bulkAddRow = function(tableId, item) {
   const tr = document.createElement('tr');
   tr.id = rid;
   tr.innerHTML = `
-    <td class="col-date"><input type="text" value="${escHtml(String(dateVal))}" placeholder="例：6/2" autocomplete="off"></td>
-    <td class="col-service"><input type="text" value="${escHtml(String(svcVal))}" placeholder="サービス名" autocomplete="off"></td>
+    <td class="col-date"><input type="text" value="${escHtml(String(dateVal))}" placeholder="例：6/2" autocomplete="off" maxlength="50"></td>
+    <td class="col-service"><input type="text" value="${escHtml(String(svcVal))}" placeholder="サービス名" autocomplete="off" maxlength="150"></td>
     <td class="col-qty"${colHideStyle('qty')}><input type="number" value="${qtyVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
     <td class="col-price"${colHideStyle('price')}><input type="number" value="${priceVal}" min="0" autocomplete="off" oninput="bulkCalcRow('${rid}','${tableId}','${totalsId}')"></td>
     <td class="col-amount"><input type="number" value="${amtVal}" placeholder="0" min="0" autocomplete="off" oninput="bulkCalcTotals('${tableId}','${totalsId}')"></td>
@@ -1399,7 +1399,7 @@ window.bulkAddRow = function(tableId, item) {
         <button type="button" onclick="bulkSetTax('${rid}','${tableId}','${totalsId}',0)">0%</button>
       </div>
     </td>
-    <td class="col-remark"${colHideStyle('remark')}><input type="text" value="${escHtml(String(remVal))}" autocomplete="off"></td>
+    <td class="col-remark"${colHideStyle('remark')}><input type="text" value="${escHtml(String(remVal))}" autocomplete="off" maxlength="150"></td>
     <td class="col-delete"><button class="delete-btn" onclick="bulkDeleteRow('${rid}','${tableId}','${totalsId}')">×</button></td>
   `;
   tbody.appendChild(tr);
@@ -1634,8 +1634,8 @@ function companyFieldRowHTML(label, value) {
     <div class="free-field-row">
       <button type="button" class="field-move-btn" title="上へ移動" onclick="moveCompanyField(this,-1)">▲</button>
       <button type="button" class="field-move-btn" title="下へ移動" onclick="moveCompanyField(this,1)">▼</button>
-      <input type="text" class="free-field-label" value="${escHtml(label||'')}" placeholder="項目名（空欄可）" autocomplete="off">
-      <input type="text" class="free-field-value" value="${escHtml(value||'')}" placeholder="内容" autocomplete="off">
+      <input type="text" class="free-field-label" value="${escHtml(label||'')}" placeholder="項目名（空欄可）" autocomplete="off" maxlength="40">
+      <input type="text" class="free-field-value" value="${escHtml(value||'')}" placeholder="内容" autocomplete="off" maxlength="300">
       <button class="free-field-del" title="削除" onclick="this.closest('.free-field-row').remove()">×</button>
     </div>`;
 }
@@ -1674,7 +1674,7 @@ function buildBankEditHTML() {
     <div class="company-edit-grid">
       <div class="company-edit-full">
         <label>振込先</label>
-        <input type="text" id="cBankInfo" value="${escHtml(c.bankInfo||'')}"
+        <input type="text" id="cBankInfo" value="${escHtml(c.bankInfo||'')}" maxlength="300"
           placeholder="例：〇〇銀行 △△支店 普通 1234567 カ）サンプル" autocomplete="off">
       </div>
     </div>
