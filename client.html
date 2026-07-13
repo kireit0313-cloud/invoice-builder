@@ -52,6 +52,14 @@ body {
 .back-btn:hover { border-color: var(--accent); color: var(--accent); }
 .header-title { font-size: 16px; font-weight: 500; color: var(--ink); }
 .header-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.page-footer {
+  text-align: center;
+  padding: 18px 0 26px;
+  font-size: 11px;
+}
+.page-footer a { color: var(--ink-soft); text-decoration: none; }
+.page-footer a:hover { color: var(--accent); text-decoration: underline; }
+.footer-sep { color: var(--border, #E2E8F0); margin: 0 4px; }
 .body {
   padding: 2rem 1.5rem;
   max-width: 1080px;
@@ -652,6 +660,12 @@ body {
 
 <div class="body" id="mainBody">
   <div class="loading">データを読み込んでいます...</div>
+</div>
+
+<div class="page-footer">
+  <a href="terms.html" target="_blank" rel="noopener">利用規約</a>
+  <span class="footer-sep">｜</span>
+  <a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
 </div>
 
 <script type="module">
