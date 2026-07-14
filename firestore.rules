@@ -35,12 +35,13 @@ service cloud.firestore {
       // クライアントの新規作成・削除は管理者のみ（スパム作成・破壊を防ぐ）。
       allow create, delete: if isAdmin();
 
-      // 更新：管理者は自由。顧客(未認証)は「会社情報の保存」に限り許可し、
-      //       社名・clientName・clientId は変更させない（なりすまし・改ざん防止）。
+      // 更新：管理者は自由。顧客(未認証)は「会社情報の保存」と「明細の項目名(columns)の保存」に
+      //       限り許可し、社名・clientName・clientId は変更させない（なりすまし・改ざん防止）。
+      //       ※'columns'は2026/7/14に追加（項目名編集を管理画面→顧客ページへ移管したため）。
       allow update: if isAdmin()
         || (
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['companyInfo', 'projectFields', 'updatedAt'])
+            .hasOnly(['companyInfo', 'projectFields', 'updatedAt', 'columns'])
           && request.resource.data.companyInfo.name == resource.data.companyInfo.name
           && request.resource.data.clientName == resource.data.clientName
           && request.resource.data.clientId == resource.data.clientId
