@@ -95,6 +95,31 @@ body {
   white-space: nowrap;
 }
 
+/* ===== 明細の項目名（共通項目） ===== */
+.col-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.col-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+.col-badge {
+  flex: none;
+  width: 64px;
+  text-align: center;
+  font-size: 12px;
+  padding: 5px 0;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.col-badge-req { background: #eef2f7; color: #5f6b7a; }
+.col-badge-fixed { background: #f2f2f2; color: #999; }
+.col-badge-opt { background: #e8f0fb; color: #2c5aa0; cursor: pointer; }
+.col-badge-opt input { vertical-align: -1px; margin-right: 2px; }
+.col-name-input.col-off { opacity: 0.4; }
+
 /* ===== 取引先一覧 ===== */
 .partner-list { display: flex; flex-direction: column; gap: 8px; }
 .partner-item {
@@ -812,6 +837,13 @@ function renderPartnerList() {
       <p class="card-title">PDFの配色（カラー）<span class="common-badge">共通項目</span></p>
       <p class="hint" style="margin-top:-6px;margin-bottom:12px;">タイトル・見出し・合計欄などにアクセントカラーを適用します。グレーを選ぶと標準の配色になります。</p>
       ${buildThemeEditHTML()}
+    </div>
+
+    <!-- 明細の項目名編集 -->
+    <div class="card">
+      <p class="card-title">明細の項目名<span class="common-badge">共通項目</span></p>
+      <p class="hint" style="margin-top:-6px;margin-bottom:12px;">明細表とPDFに表示される見出しです。「数量」「単価」「備考」は使わない場合、チェックを外すと入力欄とPDFの両方から消え、残りの列が横幅いっぱいに広がります。日付・内容・金額・税率は必須のため常に表示されます。</p>
+      ${buildColumnsEditHTML()}
     </div>
   `;
   updateBulkBar();
@@ -2049,6 +2081,73 @@ window.saveThemeInfo = async function() {
     }, { merge: true });
     currentClient.companyInfo = updated;
     showToast('配色を保存しました。', 'success');
+  } catch(e) {
+    showToast('保存に失敗しました：' + e.message, 'error');
+  }
+};
+
+// =====================
+//  明細の項目名（ラベル編集＋列ON/OFF）
+// =====================
+// columns = [{name, enabled}×6]（クライアント単位・Firestoreの'columns'フィールド）。
+// 位置：0日付 1内容 2数量 3単価 4金額 5備考（税率は固定・columns対象外）。
+// enabledは数量(2)・単価(3)・備考(5)のみ意味を持つ。旧データ（enabled無し）は全表示扱い。
+// 明細表・一括編集表・PDFはgetColumnLabels()/colEnabled()経由で開くたびに再構築されるため、
+// 保存時はcurrentClient.columnsのメモリ更新だけでよい（画面の再描画処理は不要）。
+const COL_DEFS = [
+  { i: 0, def: '日付',        opt: false },
+  { i: 1, def: '内容',        opt: false },
+  { i: 2, def: '数量',        opt: true },
+  { i: 3, def: '単価（税抜）', opt: true },
+  { i: 4, def: '金額（税抜）', opt: false },
+  { i: 5, def: '備考',        opt: true },
+];
+function buildColumnsEditHTML() {
+  const cols = currentClient?.columns || [];
+  const rowHtml = (c) => {
+    const saved = cols[c.i];
+    const name = (saved && saved.name) ? saved.name : c.def;
+    const on = !saved || saved.enabled !== false;
+    const badge = c.opt
+      ? `<label class="col-badge col-badge-opt"><input type="checkbox" id="colOn${c.i}" ${on ? 'checked' : ''} onchange="onColToggle()"> 表示</label>`
+      : `<span class="col-badge col-badge-req">必須</span>`;
+    return `<div class="col-row">${badge}<input type="text" id="colName${c.i}" class="col-name-input${c.opt && !on ? ' col-off' : ''}" value="${escHtml(name)}" maxlength="20" autocomplete="off"></div>`;
+  };
+  // 表示順は明細表と同じ（税率は備考の前・固定）
+  const taxRow = `<div class="col-row"><span class="col-badge col-badge-fixed">固定</span><input type="text" class="col-name-input" value="税率（%）" disabled style="background:#f2f2f2;color:#999;"></div>`;
+  return `
+    <div id="colRows">
+      ${rowHtml(COL_DEFS[0])}
+      ${rowHtml(COL_DEFS[1])}
+      ${rowHtml(COL_DEFS[2])}
+      ${rowHtml(COL_DEFS[3])}
+      ${rowHtml(COL_DEFS[4])}
+      ${taxRow}
+      ${rowHtml(COL_DEFS[5])}
+    </div>
+    <button class="company-save-btn" onclick="saveColumnsInfo()">明細の項目名を保存</button>
+  `;
+}
+// OFFの列は名称入力欄をうすく表示（見た目でOFFと分かるように）
+window.onColToggle = function() {
+  [2, 3, 5].forEach(i => {
+    const on = document.getElementById('colOn' + i)?.checked;
+    document.getElementById('colName' + i)?.classList.toggle('col-off', !on);
+  });
+};
+window.saveColumnsInfo = async function() {
+  const columns = COL_DEFS.map(c => {
+    const name = (document.getElementById('colName' + c.i)?.value || '').trim() || c.def;
+    const enabled = c.opt ? !!document.getElementById('colOn' + c.i)?.checked : true;
+    return { name, enabled };
+  });
+  try {
+    await setDoc(doc(db, 'clients', clientId), {
+      columns: columns,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    currentClient.columns = columns;
+    showToast('明細の項目名を保存しました。', 'success');
   } catch(e) {
     showToast('保存に失敗しました：' + e.message, 'error');
   }

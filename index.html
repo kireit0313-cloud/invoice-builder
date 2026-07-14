@@ -398,43 +398,8 @@ body {
       </p>
     </div>
 
-    <!-- ②明細の項目名カード -->
-    <div class="card">
-      <p class="card-title">明細の項目名</p>
-      <p style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">
-        クライアント画面の明細表に表示される見出しです。お客様に合わせて名称を変更できます。「数量」「単価」「備考」は使わない場合、チェックを外すと入力欄とPDFの両方から消え、残りの列が横幅いっぱいに広がります。日付・内容・金額・税率は必須のため常に表示されます。
-      </p>
-      <div id="colRows">
-        <div class="col-row">
-          <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName0" class="client-input col-name-input" maxlength="20">
-        </div>
-        <div class="col-row">
-          <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName1" class="client-input col-name-input" maxlength="20">
-        </div>
-        <div class="col-row">
-          <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn2" checked> 表示</label>
-          <input type="text" id="colName2" class="client-input col-name-input" maxlength="20">
-        </div>
-        <div class="col-row">
-          <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn3" checked> 表示</label>
-          <input type="text" id="colName3" class="client-input col-name-input" maxlength="20">
-        </div>
-        <div class="col-row">
-          <span class="col-badge col-badge-req">必須</span>
-          <input type="text" id="colName4" class="client-input col-name-input" maxlength="20">
-        </div>
-        <div class="col-row">
-          <span class="col-badge col-badge-fixed">固定</span>
-          <input type="text" class="client-input col-name-input" value="税率（%）" disabled style="background:#f2f2f2;color:#999;">
-        </div>
-        <div class="col-row">
-          <label class="col-badge col-badge-opt"><input type="checkbox" id="colOn5" checked> 表示</label>
-          <input type="text" id="colName5" class="client-input col-name-input" maxlength="20">
-        </div>
-      </div>
-    </div>
+    <!-- ②明細の項目名カード：2026/7/14にクライアント画面（client.html）へ移管。
+         他の共通項目（会社情報・振込先・印鑑・配色）と同じくお客様側で編集する。 -->
 
     <!-- 保存ボタン -->
     <button class="save-btn" id="saveBtn">
@@ -607,53 +572,18 @@ function showConfirm(msg, opts) {
   });
 }
 
-// ========== 明細の項目名（ラベル編集＋列ON/OFF） ==========
-// 列の定義。i＝位置（client.html/index.jsと共通）、opt＝表示ON/OFF可能な列。
-// 位置：0作業日 1サービス名 2数量 3単価 4金額 5備考（税率は固定・columns対象外）。
-const COL_DEFS = [
-  { i: 0, def: '日付',        opt: false },
-  { i: 1, def: '内容',        opt: false },
-  { i: 2, def: '数量',        opt: true },
-  { i: 3, def: '単価（税抜）', opt: true },
-  { i: 4, def: '金額（税抜）', opt: false },
-  { i: 5, def: '備考',        opt: true },
+// ========== 明細の項目名（columns）について ==========
+// 2026/7/14にクライアント画面（client.html）へ編集機能を移管。
+// この画面では編集せず、保存時に既存のcolumnsを保持するだけ（下記saveBtn参照）。
+// 新規クライアントにはデフォルト（全表示）のcolumnsを入れる。
+const DEFAULT_COLUMNS = [
+  { name: '日付',        enabled: true },
+  { name: '内容',        enabled: true },
+  { name: '数量',        enabled: true },
+  { name: '単価（税抜）', enabled: true },
+  { name: '金額（税抜）', enabled: true },
+  { name: '備考',        enabled: true },
 ];
-
-// 保存済みcolumns（無ければnull）でUIを初期化。新規登録時はデフォルト名・全ON。
-function setColUI(columns) {
-  COL_DEFS.forEach(c => {
-    const saved = columns && columns[c.i];
-    document.getElementById('colName' + c.i).value = (saved && saved.name) ? saved.name : c.def;
-    if (c.opt) {
-      const on = !saved || saved.enabled !== false;
-      document.getElementById('colOn' + c.i).checked = on;
-    }
-  });
-  updateColDim();
-}
-
-// OFFの列は名称入力欄をうすく表示（見た目でOFFと分かるように）
-function updateColDim() {
-  [2, 3, 5].forEach(i => {
-    const on = document.getElementById('colOn' + i).checked;
-    document.getElementById('colName' + i).classList.toggle('col-off', !on);
-  });
-}
-[2, 3, 5].forEach(i => {
-  document.getElementById('colOn' + i).addEventListener('change', updateColDim);
-});
-
-// UIから保存用のcolumns配列（{name, enabled}×6）を作る
-function getColumnsFromUI() {
-  return COL_DEFS.map(c => {
-    const name = document.getElementById('colName' + c.i).value.trim() || c.def;
-    const enabled = c.opt ? document.getElementById('colOn' + c.i).checked : true;
-    return { name, enabled };
-  });
-}
-
-// 初期表示（新規登録＝デフォルト）。編集時はeditClientでsetColUIを呼び直す。
-setColUI(null);
 
 // ========== ステップ7：Firestoreに保存 ==========
 
@@ -668,9 +598,6 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     showToast('クライアント名を入力してください', 'error');
     return;
   }
-
-  // 明細の項目名・表示ON/OFFをまとめる（{name, enabled}×6）
-  const columns = getColumnsFromUI();
 
   // クライアントID：編集中の既存クライアントならそのIDを維持、
   // 新規クライアントならランダムなIDを新しく発行する（会社名の使い回し・推測対策）
@@ -703,6 +630,15 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const existingCompany = (existingSnap.exists() && existingSnap.data().companyInfo)
       ? existingSnap.data().companyInfo : {};
     const companyInfo = { ...existingCompany, name: companyNameValue };
+
+    // 明細の項目名（columns）はクライアント画面で編集する（2026/7/14移管）。
+    // この画面の保存（setDoc全上書き）で消えないよう既存値を保持し、
+    // 新規クライアントにはデフォルト（全表示）を入れる。
+    const columns = (existingSnap.exists()
+      && Array.isArray(existingSnap.data().columns)
+      && existingSnap.data().columns.length > 0)
+      ? existingSnap.data().columns
+      : DEFAULT_COLUMNS;
 
     await setDoc(doc(db, 'clients', clientId), {
       clientName: clientName,
@@ -961,8 +897,7 @@ window.editClient = async function(clientId) {
     const company = d.companyInfo || {};
     document.getElementById('companyName').value = company.name || '';
 
-    // 明細の項目名・表示ON/OFFを復元（未設定の旧データはデフォルト＝全表示）
-    setColUI(d.columns && d.columns.length > 0 ? d.columns : null);
+    // 明細の項目名（columns）はクライアント画面で編集（2026/7/14移管・この画面では扱わない）
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch(e) {
