@@ -812,6 +812,13 @@ function renderPartnerList() {
       </div>
     </div>
 
+    <!-- PDFのタイトル -->
+    <div class="card">
+      <p class="card-title">PDFのタイトル<span class="common-badge">共通項目</span></p>
+      <p class="hint" style="margin-top:-6px;margin-bottom:12px;">請求書PDFの一番上に表示されるタイトルです。</p>
+      ${buildTitleEditHTML()}
+    </div>
+
     <!-- 会社情報編集 -->
     <div class="card">
       <p class="card-title">会社情報の編集<span class="common-badge">共通項目</span></p>
@@ -1734,6 +1741,38 @@ function companyFieldRowHTML(label, value) {
     </div>`;
 }
 
+// PDFのタイトル（請求書／ご請求書）。クライアント単位の共通設定。
+function buildTitleEditHTML() {
+  const c = currentClient?.companyInfo || {};
+  const t = (c.invoiceTitle === 'ご請求書') ? 'ご請求書' : '請求書';
+  const opt = (val) => `
+    <label style="display:inline-flex;align-items:center;gap:6px;margin-right:20px;cursor:pointer;">
+      <input type="radio" name="invoiceTitle" value="${val}" ${t === val ? 'checked' : ''}>
+      <span>${val}</span>
+    </label>`;
+  return `
+    <div style="margin-bottom:12px;">${opt('請求書')}${opt('ご請求書')}</div>
+    <button class="company-save-btn" onclick="saveTitleInfo()">タイトルを保存</button>
+  `;
+}
+
+window.saveTitleInfo = async function() {
+  const c = currentClient?.companyInfo || {};
+  const sel = document.querySelector('input[name="invoiceTitle"]:checked');
+  const invoiceTitle = (sel && sel.value === 'ご請求書') ? 'ご請求書' : '請求書';
+  const updated = { ...c, invoiceTitle };
+  try {
+    await setDoc(doc(db, 'clients', clientId), {
+      companyInfo: updated,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    currentClient.companyInfo = updated;
+    showToast('PDFのタイトルを保存しました。', 'success');
+  } catch(e) {
+    showToast('保存に失敗しました：' + e.message, 'error');
+  }
+};
+
 function buildCompanyEditHTML() {
   const c = currentClient?.companyInfo || {};
   const rows = getCompanyFields().map(f => companyFieldRowHTML(f.label, f.value)).join('');
@@ -1751,6 +1790,7 @@ function buildCompanyEditHTML() {
     <div class="free-fields" id="companyCustomFields">${rows}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
       <button class="add-field-btn" style="width:auto;flex:1;min-width:140px;margin-top:0;" onclick="addCompanyCustomField()">＋ 項目を追加</button>
+      <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('〒')">＋〒</button>
       <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('住所')">＋住所</button>
       <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('TEL')">＋TEL</button>
       <button class="add-field-btn" style="width:auto;margin-top:0;" onclick="addCompanyCustomField('FAX')">＋FAX</button>
