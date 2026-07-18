@@ -58,7 +58,7 @@
 6. GitHubのファイル取得は`web_fetch`で`raw.githubusercontent.com`を読む（bashの`curl`等でのURL取得は不可）
    例：`https://raw.githubusercontent.com/kireit0313-cloud/invoice-builder/main/client.html`
 7. **新しいセッションの開始時は`invoice-builder-CONTEXT.md`を読み込んでから作業を始める**
-   → 読み込み元は接続フォルダ`見積請求PWA開発/invoice-builder/`を優先。未接続のときだけGitHubから読む。編集後は必ずGitHubにもUploadして同期する。
+   → 読み込み元は接続フォルダ`見積請求PWA開発/開発/invoice-builder/`を優先（2026/7/18フォルダ再編）。未接続のときだけGitHubから読む。編集後は必ずGitHubにもUploadして同期する。
 
 ## 機能要件・開発フェーズ・競合ポジションについて
 
