@@ -11,6 +11,7 @@ Tsuyoshiさん（非エンジニア）が中小企業向けに販売するWebベ
 ## 技術スタック・インフラ
 
 - **フロント**：素のHTML/JS（ビルドなし）。`index.html`=管理画面（Tsuyoshi専用）、`client.html`=顧客ページ。ホスティング=Vercel（mainへpushで自動デプロイ）
+  - ※React+Vite等のビルド方式は構想段階で検討の上**意図的に不採用**（GitHub Web UI直接編集の運用に合わせた確定方針。以後も提案しない）
 - **DB/認証**：Firebase Firestore + Auth（Google login）。プロジェクト=`invoice-builder-4b77e`（専用・Blaze・`asia-northeast1`）
 - **PDF生成**：Cloud Run + Puppeteer（`invoice-pdf-server`、Node22 / Puppeteer 21.11.0固定・自前Chromium。稼働GCPプロジェクトは`idea-notebook-172e0`のまま）
 - **ライブラリ**：JSZip（ZIP出力）。SheetJSは全廃済み
