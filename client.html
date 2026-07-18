@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>請求書入力</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&family=Yuji+Syuku&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -966,12 +971,9 @@ function showDetailScreen(partner, imported) {
     <div class="card">
       <p class="card-title">発行日・請求書番号</p>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span id="issueDateDisplay" style="font-size:15px;font-weight:bold;"></span>
+        <input type="text" id="issueDateInput" placeholder="例：2026年7月31日" maxlength="30" autocomplete="off"
+          style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:bold;width:200px;">
         <span id="issueDayLabel" style="font-size:13px;color:var(--ink-soft);"></span>
-        <button class="add-field-btn" onclick="toggleIssueDateEdit()" style="margin:0;">変更</button>
-        <input type="text" id="issueDateCustom" placeholder="例：2026年7月31日" maxlength="30"
-          style="display:none;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:200px;"
-          oninput="updateIssueDateDisplay()">
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;">
         <label for="invoiceNoInput" style="font-size:13px;color:var(--ink);min-width:84px;">請求書番号</label>
@@ -1055,15 +1057,10 @@ function showDetailScreen(partner, imported) {
     addRow();
   }
 
-  // 発行日の初期表示（保存済みissueDateがあればそれを優先）
+  // 発行日の初期表示（保存済みissueDateがあればそれを優先。入力欄で直接編集可能）
   const issueDay = partner.issueDay || '末日';
-  const computed = partner.issueDate || calcIssueDate(issueDay);
-  document.getElementById('issueDateDisplay').textContent = computed;
+  document.getElementById('issueDateInput').value = effectiveIssueDate(partner);
   document.getElementById('issueDayLabel').textContent = `（締め日：${issueDay === '手入力' ? '手入力' : issueDay + '日'}）`;
-  if (issueDay === '手入力') {
-    document.getElementById('issueDateCustom').style.display = 'inline-block';
-    document.getElementById('issueDateCustom').value = computed;
-  }
 }
 
 // =====================
@@ -1384,7 +1381,8 @@ window.openBulkEditMode = function() {
       <div class="bulk-edit-body" id="${bodyId}">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0 4px;">
           <span style="font-size:13px;color:var(--ink-soft);">発行日：</span>
-          <span style="font-size:14px;font-weight:bold;">${escHtml(p.issueDate || calcIssueDate(p.issueDay || '末日'))}</span>
+          <input type="text" id="beissue_${p.id}" value="${escHtml(effectiveIssueDate(p))}" placeholder="例：2026年7月31日" maxlength="30" autocomplete="off"
+            style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-weight:bold;width:180px;">
           <span style="font-size:12px;color:var(--ink-soft);">（締め日：${escHtml(p.issueDay && p.issueDay !== '手入力' ? p.issueDay + '日' : p.issueDay || '末日')}）</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 0 8px;">
@@ -1546,7 +1544,7 @@ window.bulkSaveAll = async function() {
     for (const p of targets) {
       const tableId = 'betbl_' + p.id;
       const items = bulkGetLineItems(tableId);
-      const issueDate = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      const issueDate = document.getElementById('beissue_' + p.id)?.value.trim() || effectiveIssueDate(p);
       const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
       await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
         partnerName: p.partnerName,
@@ -1559,6 +1557,7 @@ window.bulkSaveAll = async function() {
         updatedAt:   serverTimestamp(),
       }, { merge: true });
       p.invoiceNo = invoiceNo;
+      p.issueDate = issueDate;
     }
     btn.textContent = '保存しました ✓';
     setTimeout(() => { btn.textContent = '全件内容保存'; btn.disabled = false; }, 2000);
@@ -1582,7 +1581,7 @@ window.bulkBackupExport = async function() {
     for (const p of targets) {
       const items = bulkGetLineItems('betbl_' + p.id);
       const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
-      const issueDate = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      const issueDate = document.getElementById('beissue_' + p.id)?.value.trim() || effectiveIssueDate(p);
       const backup = {
         _type: 'invoice-builder-partner-backup', _version: 1,
         exportedAt: new Date().toISOString(),
@@ -1646,7 +1645,7 @@ window.bulkEditExport = async function() {
       const items = bulkGetLineItems(tableId);
       const freeFields = p.freeFields || [];
       const remarksLower = p.remarksLower || '';
-      const issueDateBulk = p.issueDate || calcIssueDate(p.issueDay || '末日');
+      const issueDateBulk = document.getElementById('beissue_' + p.id)?.value.trim() || effectiveIssueDate(p);
       const invoiceNo = document.getElementById('beinv_' + p.id)?.value.trim() ?? (p.invoiceNo || '');
 
       try {
@@ -1664,6 +1663,7 @@ window.bulkEditExport = async function() {
         // Firestoreへ保存（先月データ更新）
         await setDoc(doc(db, 'clients', clientId, 'partners', p.id), {
           partnerName: p.partnerName,
+          issueDate:   issueDateBulk,
           lineItems:   items,
           freeFields:  freeFields,
           remarksLower: remarksLower,
@@ -1671,6 +1671,7 @@ window.bulkEditExport = async function() {
           updatedAt:   serverTimestamp(),
         }, { merge: true });
         p.invoiceNo = invoiceNo;
+        p.issueDate = issueDateBulk;
 
       } catch(e) {
         console.warn(`${p.partnerName} のPDF生成失敗:`, e.message);
@@ -2295,29 +2296,16 @@ function calcIssueDate(issueDay) {
   const d = now.getDate();
   return `${y}年${m + 1}月${d}日`;
 }
-  // 発行日の「変更」ボタン
-window.toggleIssueDateEdit = function() {
-  const input = document.getElementById('issueDateCustom');
-  if (input.style.display === 'none') {
-    input.style.display = 'inline-block';
-    if (!input.value) input.value = document.getElementById('issueDateDisplay').textContent;
-  } else {
-    input.style.display = 'none';
-    if (input.value.trim()) {
-      document.getElementById('issueDateDisplay').textContent = input.value.trim();
-    }
-  }
-};
+// 表示すべき発行日を返す：保存値があればそのまま、なければ締め日から計算
+// ※月替わりの自動更新は仕様検討中のため未実装（経緯はCONTEXT参照）
+function effectiveIssueDate(p) {
+  const issueDay = (p && p.issueDay) || '末日';
+  return (p && p.issueDate) || calcIssueDate(issueDay);
+}
 
-// 手入力欄の変更をリアルタイム反映
-window.updateIssueDateDisplay = function() {
-  const val = document.getElementById('issueDateCustom').value.trim();
-  if (val) document.getElementById('issueDateDisplay').textContent = val;
-};
-
-// 現在の発行日を取得（PDF生成時に使用）
+// 現在の発行日を取得（保存・PDF生成時に使用）
 function getIssueDate() {
-  return document.getElementById('issueDateDisplay')?.textContent || calcIssueDate('末日');
+  return document.getElementById('issueDateInput')?.value.trim() || calcIssueDate('末日');
 }
 
 function todayStr() {

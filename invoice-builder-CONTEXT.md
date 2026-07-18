@@ -33,6 +33,7 @@ Tsuyoshiさん（非エンジニア）が中小企業向けに販売するWebベ
   - `columns = [{name, enabled}×6]`（明細項目名・位置固定：0日付 1内容 2数量 3単価 4金額 5備考。税率は固定で対象外。enabledは数量/単価/備考のみ有効。旧データは全ONとして互換）
   - `maxPartners`（任意int64。取引先上限の個別上書き。既定50はclient.htmlのコード側）
 - `clients/{clientId}/partners/{partnerId}`：`partnerName, honorific, issueDay, issueDate, invoiceNo, lineItems, freeFields(上段), remarksLower(下段)`。**最新1回分のみ保存**（履歴なし・前月値を引き継いで上書き）
+- 発行日（issueDate）：個別・一括画面とも**常時表示の入力欄で直接編集**（2026/7/19。旧「変更」ボタン廃止）。表示は保存値優先、なければ締め日から当月分を計算（`effectiveIssueDate`）。一括画面の保存・PDF・バックアップも入力欄の値を使用し、一括PDF後はissueDateも保存される
 - バックアップJSON：取引先単位`{_type:'invoice-builder-partner-backup', _version:1, ...}`。一括=同スキーマをZIPに複数格納（個別復元と互換）。管理画面の全体バックアップ=全クライアント+partners込み。復元時はTimestampを`new Timestamp(seconds, nanoseconds)`で戻す
 
 ### 共通項目の設計
@@ -71,6 +72,7 @@ Tsuyoshiさん（非エンジニア）が中小企業向けに販売するWebベ
 
 ### 低優先の残作業
 
+- **発行日の月替わり自動更新（仕様保留・2026/7/19）**：現状は保存値がそのまま残り、月が替わっても自動では変わらない（毎月手で書き換える運用）。改良案は「発行日の年月が過去」かつ「最終保存(updatedAt)も過去の月」のときだけ締め日から当月分を再計算＝「今月保存していなければ自動で今月の日付、今月保存したら固定」の1ルール。締め日「手入力」は常に据え置き。使う側の分かりやすさを懸念して保留中
 - Cloud Runデプロイ高速化（現状`--source`フルビルドで約13分→イメージビルド+キャッシュ方式で2〜4分。方針合意済み・アーカイブ7-2）
 - 一括「復元」（ZIP→全取引先一括）／SendGridメール送信／削除済みGCPプロジェクト5個の完全削除確認
 - estimate-builder（見積書ツール・別リポジトリ）構想。新規立ち上げ手順テンプレはアーカイブ末尾参照
